@@ -1,130 +1,194 @@
 # -*- coding: utf-8 -*-
 
 """
-Integration tests for build_source_artifacts_using_uv.
+Integration tests for builder functions: build_source_artifacts_using_pip,
+build_source_artifacts_using_uv, and create_source_zip.
 
-These tests actually invoke uv and install the current project into a
-temporary directory under tests/build/lambda/build_source_artifacts_using_uv/.
+Each build tool gets its own SourcePathLayout so the outputs are isolated:
 
-The directory is left on disk after the test so the developer can inspect the
-installed files.  It is cleaned at the start of each run by the function under
-test (skip_prompt=True).
+    tests/build/lambda/source/using_pip/build/   ← pip install target
+    tests/build/lambda/source/using_pip/source.zip
+    tests/build/lambda/source/using_uv/build/    ← uv install target
+    tests/build/lambda/source/using_uv/source.zip
 
-uv is resolved via shutil.which("uv"); the test is skipped when uv is not on PATH.
+Directories are left on disk after the test run so the developer can inspect
+them.  They are cleaned at the start of each run (skip_prompt=True).
 """
 
 import shutil
+import zipfile
 from pathlib import Path
 
 import pytest
 
-from aws_lbd_art_builder_core.source.builder import build_source_artifacts_using_uv
+from aws_lbd_art_builder_core.source.foundation import SourcePathLayout
+from aws_lbd_art_builder_core.source.builder import (
+    build_source_artifacts_using_pip,
+    build_source_artifacts_using_uv,
+    create_source_zip,
+)
 
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
 
-# The project root this test lives in
 DIR_PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 PATH_PYPROJECT_TOML = DIR_PROJECT_ROOT / "pyproject.toml"
 
-# Dedicated temp dir for this test — used as dir_lambda_source_build
-DIR_LAMBDA_SOURCE_BUILD = (
-    Path(__file__).parent
-    / "build"
-    / "lambda"
-    / "source"
-    / "using_uv"
-    / "build"
+DIR_TESTS = Path(__file__).parent
+
+LAYOUT_PIP = SourcePathLayout(
+    dir_root=DIR_TESTS / "build" / "lambda" / "source" / "using_pip"
+)
+LAYOUT_UV = SourcePathLayout(
+    dir_root=DIR_TESTS / "build" / "lambda" / "source" / "using_uv"
 )
 
 # ---------------------------------------------------------------------------
-# Fixtures / helpers
+# Fixtures
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
+def path_bin_pip() -> Path:
+    # builder.py converts Path to str via f"{path_bin_pip}" before subprocess.run,
+    # so the Windows PathLike warning from the IDE is a false positive.
+    return DIR_PROJECT_ROOT / ".venv" / "bin" / "pip"
+
+
+@pytest.fixture(scope="module")
 def path_bin_uv() -> Path:
-    """Resolve uv binary from PATH."""
     uv = shutil.which("uv")
     assert uv is not None, "uv not found on PATH — install uv to run these tests"
-    # shutil.which returns str, so Path(uv) is safe here.
-    # The IDE warns about PathLike on Windows <3.12, but builder.py converts
-    # path_bin_uv to str via f"{path_bin_uv}" before passing to subprocess.run.
+    # Same note as above re: PathLike.
     return Path(uv)
 
 
 @pytest.fixture(scope="module")
-def installed_dir(path_bin_uv) -> Path:
-    """
-    Run build_source_artifacts_using_uv once for the whole test module and
-    return the populated dir_lambda_source_build.
-    """
-    build_source_artifacts_using_uv(
-        path_bin_uv=path_bin_uv,
+def pip_build_dir(path_bin_pip) -> Path:
+    """Run pip build once for the whole module; return dir_build."""
+    build_source_artifacts_using_pip(
+        path_bin_pip=path_bin_pip,
         path_pyproject_toml=PATH_PYPROJECT_TOML,
-        dir_lambda_source_build=DIR_LAMBDA_SOURCE_BUILD,
+        dir_lambda_source_build=LAYOUT_PIP.dir_build,
         skip_prompt=True,
         verbose=True,
     )
-    return DIR_LAMBDA_SOURCE_BUILD
+    return LAYOUT_PIP.dir_build
+
+
+@pytest.fixture(scope="module")
+def uv_build_dir(path_bin_uv) -> Path:
+    """Run uv build once for the whole module; return dir_build."""
+    build_source_artifacts_using_uv(
+        path_bin_uv=path_bin_uv,
+        path_pyproject_toml=PATH_PYPROJECT_TOML,
+        dir_lambda_source_build=LAYOUT_UV.dir_build,
+        skip_prompt=True,
+        verbose=True,
+    )
+    return LAYOUT_UV.dir_build
+
+
+@pytest.fixture(scope="module")
+def uv_zip_sha256(uv_build_dir) -> str:
+    """Run create_source_zip on the uv build; return the sha256."""
+    return create_source_zip(
+        dir_lambda_source_build=LAYOUT_UV.dir_build,
+        path_source_zip=LAYOUT_UV.path_source_zip,
+        verbose=True,
+    )
 
 
 # ---------------------------------------------------------------------------
-# Tests
+# Shared assertions (used by both pip and uv test classes)
+# ---------------------------------------------------------------------------
+
+def _assert_build_dir(build_dir: Path):
+    assert build_dir.exists() and build_dir.is_dir()
+    assert (build_dir / "aws_lbd_art_builder_core").is_dir()
+    assert (build_dir / "aws_lbd_art_builder_core" / "__init__.py").exists()
+    # setuptools exclude rules respected
+    assert not (build_dir / "aws_lbd_art_builder_core" / "tests").exists()
+    assert not (build_dir / "aws_lbd_art_builder_core" / "docs").exists()
+    # dist-info present, exactly one
+    dist_infos = list(build_dir.glob("aws_lbd_art_builder_core-*.dist-info"))
+    assert len(dist_infos) == 1, f"Expected 1 dist-info, got: {dist_infos}"
+    # no transitive deps leaked
+    for dep in ("func_args", "soft_deps", "boto3", "s3pathlib"):
+        assert not (build_dir / dep).exists(), f"Dep '{dep}' leaked despite --no-deps"
+
+
+# ---------------------------------------------------------------------------
+# Tests: build_source_artifacts_using_pip
+# ---------------------------------------------------------------------------
+
+class TestBuildSourceArtifactsUsingPip:
+    def test_build_dir_structure(self, pip_build_dir):
+        _assert_build_dir(pip_build_dir)
+
+    def test_source_zip_not_inside_build_dir(self, pip_build_dir):
+        # source.zip must be a sibling of dir_build, not nested inside it.
+        assert not (pip_build_dir / "source.zip").exists()
+
+
+# ---------------------------------------------------------------------------
+# Tests: build_source_artifacts_using_uv
 # ---------------------------------------------------------------------------
 
 class TestBuildSourceArtifactsUsingUv:
-    def test_target_dir_is_created(self, installed_dir):
-        assert installed_dir.exists()
-        assert installed_dir.is_dir()
+    def test_build_dir_structure(self, uv_build_dir):
+        _assert_build_dir(uv_build_dir)
 
-    def test_package_is_installed(self, installed_dir):
-        """The main package directory must be present in the target."""
-        assert (installed_dir / "aws_lbd_art_builder_core").is_dir()
+    def test_source_zip_not_inside_build_dir(self, uv_build_dir):
+        assert not (uv_build_dir / "source.zip").exists()
 
-    def test_package_is_importable_from_target(self, installed_dir):
-        """
-        Verify that the installed files form a valid Python package by checking
-        __init__.py exists (import machinery check without sys.path manipulation).
-        """
-        init = installed_dir / "aws_lbd_art_builder_core" / "__init__.py"
-        assert init.exists()
 
-    def test_tests_subpackage_is_excluded(self, installed_dir):
-        """
-        [tool.setuptools.packages.find] excludes aws_lbd_art_builder_core.tests
-        so the Lambda zip doesn't ship test code.
-        """
-        assert not (installed_dir / "aws_lbd_art_builder_core" / "tests").exists()
+# ---------------------------------------------------------------------------
+# Tests: create_source_zip  (uses the uv build as input)
+# ---------------------------------------------------------------------------
 
-    def test_docs_subpackage_is_excluded(self, installed_dir):
-        """
-        [tool.setuptools.packages.find] excludes aws_lbd_art_builder_core.docs.
-        """
-        assert not (installed_dir / "aws_lbd_art_builder_core" / "docs").exists()
+class TestCreateSourceZip:
+    def test_zip_file_is_created(self, uv_zip_sha256):
+        assert LAYOUT_UV.path_source_zip.exists()
 
-    def test_dist_info_is_present(self, installed_dir):
-        """pip/uv --target installs a .dist-info directory for the package."""
-        dist_infos = list(installed_dir.glob("aws_lbd_art_builder_core-*.dist-info"))
-        assert len(dist_infos) == 1, (
-            f"Expected exactly one dist-info, found: {dist_infos}"
+    def test_returns_non_empty_hash(self, uv_zip_sha256):
+        # hashes.of_paths() uses SHA256 by default → 64-char hex digest
+        assert isinstance(uv_zip_sha256, str)
+        assert len(uv_zip_sha256) == 64
+
+    def test_zip_entries_are_at_root(self, uv_zip_sha256):
+        """
+        Zip entries must not carry absolute paths or a build/ prefix.
+        The Lambda runtime expects to find package dirs at the archive root.
+        """
+        with zipfile.ZipFile(LAYOUT_UV.path_source_zip) as zf:
+            names = zf.namelist()
+        assert len(names) > 0
+        for name in names:
+            assert not name.startswith("/"), f"Absolute path in zip: {name}"
+
+    def test_zip_contains_package(self, uv_zip_sha256):
+        with zipfile.ZipFile(LAYOUT_UV.path_source_zip) as zf:
+            names = zf.namelist()
+        assert any(n.startswith("aws_lbd_art_builder_core/") for n in names)
+
+    def test_zip_does_not_contain_source_zip_itself(self, uv_zip_sha256):
+        """
+        source.zip must not archive itself — only possible if path_source_zip
+        is correctly placed outside dir_build.
+        """
+        with zipfile.ZipFile(LAYOUT_UV.path_source_zip) as zf:
+            names = zf.namelist()
+        assert "source.zip" not in names
+
+    def test_same_content_same_sha256(self, uv_build_dir, uv_zip_sha256):
+        """SHA256 is deterministic for the same build directory content."""
+        sha2 = create_source_zip(
+            dir_lambda_source_build=LAYOUT_UV.dir_build,
+            path_source_zip=LAYOUT_UV.path_source_zip,
+            verbose=False,
         )
-
-    def test_no_dependency_packages_installed(self, installed_dir):
-        """
-        --no-deps must not pull in transitive dependencies (func_args, soft_deps, …).
-        Only the project's own package and its dist-info should be present.
-        """
-        unexpected = [
-            "func_args",
-            "soft_deps",
-            "boto3",
-            "s3pathlib",
-        ]
-        for name in unexpected:
-            assert not (installed_dir / name).exists(), (
-                f"Dependency '{name}' was installed despite --no-deps"
-            )
+        assert sha2 == uv_zip_sha256
 
 
 if __name__ == "__main__":

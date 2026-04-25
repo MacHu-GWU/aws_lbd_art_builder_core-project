@@ -83,6 +83,7 @@ test = [
     "pytest>=8.2.2,<9.0.0", # Testing framework
     "pytest-cov>=6.0.0,<7.0.0", # Coverage reporting
     "moto>=5.1.10,<6.0.0", # Mock AWS services for testing
+    "pip>=25.0,<30.0",
 ]
 
 # ------------------------------------------------------------------------------

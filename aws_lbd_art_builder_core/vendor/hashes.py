@@ -43,7 +43,7 @@ class Hashes:
 
     def __init__(
         self,
-        algo: HashAlgoEnum = HashAlgoEnum.md5,
+        algo: HashAlgoEnum = HashAlgoEnum.sha256,
         hexdigest: bool = True,
     ):
         self.algo = getattr(hashlib, algo.value)

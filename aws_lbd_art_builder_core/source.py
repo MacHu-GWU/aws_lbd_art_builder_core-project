@@ -49,6 +49,7 @@ from .typehint import T_PRINTER
 from .utils import clean_build_directory
 
 from .source.builder import build_source_artifacts_using_pip  # noqa: F401
+from .source.builder import create_source_zip  # noqa: F401
 
 if T.TYPE_CHECKING:  # pragma: no cover
     from mypy_boto3_s3.client import S3Client
@@ -127,61 +128,6 @@ class SourceS3Layout:
             source_sha256,
             "source.zip",
         )
-
-
-def create_source_zip(
-    dir_lambda_source_build: Path,
-    path_source_zip: Path,
-    verbose: bool = True,
-    printer: T_PRINTER = print,
-) -> str:
-    """
-    Create a compressed zip archive from the Lambda source build directory.
-
-    **Important assumption**: This function expects that the Lambda entry point
-    (typically `lambda_function.py` with a `lambda_handler` function) is included
-    within the installed package structure in the build directory, not as a separate
-    external file. The entry point should be part of your Python package as defined
-    in setup.py or pyproject.toml.
-
-    This function creates a zip file containing all files from the build directory
-    using maximum compression (level 9) and calculates the SHA256 hash of the
-    source directory for integrity verification.
-
-    :param dir_lambda_source_build: Directory containing built Lambda source files
-    :param path_source_zip: Output path for the created zip file
-    :param verbose: If True, display progress information; if False, run quietly
-    :param printer: Function to handle output messages, defaults to built-in print
-    :return: SHA256 hash of the source build directory
-    """
-    if verbose:
-        printer(f"--- Creating Lambda source zip file ...")
-        printer(f"{dir_lambda_source_build = !s}")
-        printer(f"{path_source_zip = !s}")
-
-    # Prepare zip command with maximum compression
-    args = [
-        "zip",
-        f"{path_source_zip}",
-        "-r",  # Recursive
-        "-9",  # Maximum compression
-    ]
-    # Suppress zip output in quiet mode
-    if verbose is False:
-        args.append("-q")
-
-    # Change to build directory to include all files in zip root
-    with temp_cwd(dir_lambda_source_build):
-        args.extend(glob.glob("*"))  # Add all files/directories to zip
-        subprocess.run(args, check=True)
-
-    # Calculate SHA256 hash of the source directory for integrity verification
-    source_sha256 = hashes.of_paths([dir_lambda_source_build])
-    if verbose:
-        printer(f"{source_sha256 = }")
-    return source_sha256
-
-
 
 
 def upload_source_artifacts(
