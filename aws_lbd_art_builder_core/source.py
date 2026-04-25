@@ -38,7 +38,7 @@ try:
 except ImportError:  # pragma: no cover
     import tomli as tomllib  # Python < 3.11
 
-from func_args.api import BaseFrozenModel, REQ, OPT
+from func_args.api import OPT
 from .imports import S3Path
 
 from .vendor.better_pathlib import temp_cwd
@@ -48,70 +48,85 @@ from .constants import S3MetadataKeyEnum
 from .typehint import T_PRINTER
 from .utils import clean_build_directory
 
+from .source.builder import build_source_artifacts_using_pip  # noqa: F401
+
 if T.TYPE_CHECKING:  # pragma: no cover
     from mypy_boto3_s3.client import S3Client
 
 
 @dataclasses.dataclass
 class SourcePathLayout:
-    pass
-
-
-def build_source_artifacts_using_pip(
-    path_bin_pip: Path,
-    path_setup_py_or_pyproject_toml: Path,
-    dir_lambda_source_build: Path,
-    skip_prompt: bool = False,
-    verbose: bool = True,
-    printer: T_PRINTER = print,
-):
     """
-    Build Lambda source artifacts by installing the current package using pip.
+    Local filesystem path layout for Lambda source build artifacts.
 
-    **Why pip install?** Using pip ensures proper Python package installation with correct
-    module paths, entry points, and metadata that Lambda runtime expects. This approach
-    guarantees that all package modules are discoverable and importable within the Lambda
-    execution environment, unlike simple file copying which may break import resolution.
+    :param dir_root: Root directory for source artifacts,
+        e.g. ``{dir_project_root}/build/lambda/source``
 
-    This function installs the Python package (defined by setup.py or pyproject.toml)
-    into a target directory without dependencies, suitable for Lambda deployment.
-    The build directory is cleaned before installation to ensure a fresh build.
+    Layout::
 
-    :param path_bin_pip: Path to pip executable, e.g., ``/path/to/.venv/bin/pip``
-    :param path_setup_py_or_pyproject_toml: Path to package definition file, e.g., ``/path/to/setup.py`` or ``/path/to/pyproject.toml``
-    :param dir_lambda_source_build: Target directory for built artifacts, e.g., ``/path/to/build/lambda/source/build``
-    :param verbose: If True, display detailed build output; if False, suppress pip output
-    :param skip_prompt: If True, automatically clean existing build directory without user confirmation
-    :param printer: Function to handle output messages, defaults to built-in print
+        {dir_root}/build/        ← pip install target (temporary files)
+        {dir_root}/source.zip    ← final deployment package
     """
-    if verbose:
-        printer(f"--- Building Lambda source artifacts using pip ...")
-        printer(f"{path_bin_pip = !s}")
-        printer(f"{path_setup_py_or_pyproject_toml = !s}")
-        printer(f"{dir_lambda_source_build = !s}")
 
-    # Clean existing build directory to ensure fresh installation
-    clean_build_directory(
-        dir_build=dir_lambda_source_build,
-        folder_alias="lambda source build folder",
-        skip_prompt=skip_prompt,
-    )
-    # Change to package directory for pip install
-    dir_workspace = path_setup_py_or_pyproject_toml.parent
-    with temp_cwd(dir_workspace):
-        # Build pip install command with target directory
-        args = [
-            f"{path_bin_pip}",
-            "install",
-            f"{dir_workspace}",  # Install current package
-            "--no-dependencies",  # Skip dependencies for Lambda layer separation
-            f"--target={dir_lambda_source_build}",  # Install to build directory
-        ]
-        # Suppress pip output in quiet mode
-        if verbose is False:
-            args.append("--disable-pip-version-check")
-            args.append("--quiet")
-        subprocess.run(args, check=True)
+    dir_root: Path = dataclasses.field()
+
+    @property
+    def dir_build(self) -> Path:
+        """Directory where pip installs the package (temporary files)."""
+        return self.dir_root / "build"
+
+    @property
+    def path_source_zip(self) -> Path:
+        """Final deployment zip archive."""
+        return self.dir_root / "source.zip"
+
+
+@dataclasses.dataclass
+class SourceS3Layout:
+    """
+    S3 path layout manager for Lambda source artifacts.
+
+    The root is scoped to the source-specific S3 directory so that operations
+    such as "delete everything under root" only affect source artifacts and never
+    accidentally touch sibling prefixes (e.g. ``layer/``).
+
+    :param dir_root: Source-specific S3 root directory,
+        e.g. ``s3://bucket/path/to/lambda/source/``
+
+    Layout, see :meth:`get_s3path_source_zip`::
+
+        {dir_root}/0.1.1/{source_sha256}/source.zip
+        {dir_root}/0.1.2/{source_sha256}/source.zip
+        {dir_root}/0.1.3/{source_sha256}/source.zip
+        ...
+    """
+
+    dir_root: "S3Path" = dataclasses.field()
+
+    def get_s3path_source_zip(
+        self,
+        source_version: str,
+        source_sha256: str,
+    ) -> "S3Path":
+        """
+        Generate S3 path for a specific version of the Lambda source zip.
+
+        :param source_version: Semantic version string, e.g., ``"0.1.1"``
+        :param source_sha256: SHA256 hash of the source build directory
+
+        :return: S3Path pointing to the versioned source.zip file,
+            e.g. ``{dir_root}/{source_version}/{source_sha256}/source.zip``
+
+        .. note::
+            Including the SHA256 hash in the path ensures that any code change
+            produces a new S3 key, which forces CDK / CloudFormation / AWS APIs
+            to recognise and deploy the updated Lambda function code.
+        """
+        return self.dir_root.joinpath(
+            source_version,
+            source_sha256,
+            "source.zip",
+        )
 
 
 def create_source_zip(
@@ -167,54 +182,6 @@ def create_source_zip(
     return source_sha256
 
 
-@dataclasses.dataclass
-class SourceS3Layout:
-    """
-    S3 directory layout manager for Lambda source artifacts.
-
-    This class provides a structured approach to organizing Lambda source artifacts
-    in S3 with semantic versioning. Each version gets its own directory containing
-    the source.zip file.
-
-    :param s3dir_lambda: Base S3 directory for Lambda artifacts, e.g., ``s3://bucket/path/to/lambda/``
-
-    Generated Layout, see :meth:`get_s3path_source_zip` ::
-
-        ${s3dir_lambda}/source/0.1.1/{source_sha256}/source.zip
-        ${s3dir_lambda}/source/0.1.2/{source_sha256}/source.zip
-        ${s3dir_lambda}/source/0.1.3/{source_sha256}/source.zip
-        ...
-    """
-
-    s3dir_lambda: "S3Path" = dataclasses.field()
-
-    def get_s3path_source_zip(
-        self,
-        source_version: str,
-        source_sha256: str,
-    ) -> "S3Path":
-        """
-        Generate S3 path for a specific version of the Lambda source zip.
-
-        :param source_version: Semantic version string, e.g., ``"0.1.1"``
-        :param source_sha256: SHA256 hash of the source build directory (not used in path generation)
-
-        :return: S3Path object pointing to the versioned source.zip file, example:
-            ${s3dir_lambda}/source/{source_version}/{source_sha256}/source.zip
-
-        .. note::
-            The SHA256 hash is essential for proper AWS Lambda deployments. When using CDK,
-            CloudFormation, or AWS APIs, if the S3 path remains unchanged between deployments,
-            AWS assumes the code hasn't changed and skips the update. Including the source
-            SHA256 in the path ensures that any code changes result in a new S3 location,
-            forcing AWS to recognize and deploy the updated Lambda function code.
-        """
-        return self.s3dir_lambda.joinpath(
-            "source",
-            source_version,
-            source_sha256,
-            "source.zip",
-        )
 
 
 def upload_source_artifacts(
@@ -255,9 +222,7 @@ def upload_source_artifacts(
         printer(f"{s3dir_lambda.uri =}")
 
     # Initialize S3 layout manager and get target path
-    source_s3_layout = SourceS3Layout(
-        s3dir_lambda=s3dir_lambda,
-    )
+    source_s3_layout = SourceS3Layout.from_s3dir_lambda(s3dir_lambda)
     s3path_source_zip = source_s3_layout.get_s3path_source_zip(
         source_version=source_version,
         source_sha256=source_sha256,
@@ -335,21 +300,22 @@ def build_package_upload_source_artifacts(
     # step 1: build source artifacts using pip
     path_bin_pip = dir_project_root / ".venv" / "bin" / "pip"
     path_pyproject_toml = dir_project_root / "pyproject.toml"
-    dir_lambda_source_build = dir_project_root / "build" / "lambda" / "source" / "build"
+    path_layout = SourcePathLayout(
+        dir_root=dir_project_root / "build" / "lambda" / "source"
+    )
     build_source_artifacts_using_pip(
         path_bin_pip=path_bin_pip,
         path_setup_py_or_pyproject_toml=path_pyproject_toml,
-        dir_lambda_source_build=dir_lambda_source_build,
+        dir_lambda_source_build=path_layout.dir_build,
         skip_prompt=skip_prompt,
         verbose=verbose,
         printer=printer,
     )
 
     # step 2: create compressed zip archive of the built source
-    path_source_zip = dir_lambda_source_build / "source.zip"
     source_sha256 = create_source_zip(
-        dir_lambda_source_build=dir_lambda_source_build,
-        path_source_zip=path_source_zip,
+        dir_lambda_source_build=path_layout.dir_build,
+        path_source_zip=path_layout.path_source_zip,
         verbose=verbose,
         printer=printer,
     )
@@ -361,7 +327,7 @@ def build_package_upload_source_artifacts(
         s3_client=s3_client,
         source_version=source_version,
         source_sha256=source_sha256,
-        path_source_zip=path_source_zip,
+        path_source_zip=path_layout.path_source_zip,
         s3dir_lambda=s3dir_lambda,
         verbose=verbose,
         printer=printer,

@@ -134,6 +134,10 @@ exclude = [
     "aws_lbd_art_builder_core.docs.*",
 ]
 
+[tool.setuptools.package-data]
+"aws_lbd_art_builder_core" = [
+]
+
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
