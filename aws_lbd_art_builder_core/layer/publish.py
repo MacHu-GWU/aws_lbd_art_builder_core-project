@@ -48,11 +48,11 @@ class LambdaLayerVersionPublisher(LayerManifestManager):
     - **Version Management**: Handle layer version incrementation automatically
     """
 
+    # fmt: off
     layer_name: str = dataclasses.field(default=REQ)
     lambda_client: "LambdaClient" = dataclasses.field(default=REQ)
-    publish_layer_version_kwargs: dict[str, T.Any] | None = dataclasses.field(
-        default=None
-    )
+    publish_layer_version_kwargs: dict[str, T.Any] | None = dataclasses.field(default=None)
+    # fmt: on
 
     def run(self) -> "LayerDeployment":
         """
