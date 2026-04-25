@@ -33,7 +33,9 @@ DIR_LAMBDA_SOURCE_BUILD = (
     Path(__file__).parent
     / "build"
     / "lambda"
-    / "build_source_artifacts_using_uv"
+    / "source"
+    / "using_uv"
+    / "build"
 )
 
 # ---------------------------------------------------------------------------
@@ -42,10 +44,12 @@ DIR_LAMBDA_SOURCE_BUILD = (
 
 @pytest.fixture(scope="module")
 def path_bin_uv() -> Path:
-    """Resolve uv binary; skip the whole module if uv is not on PATH."""
+    """Resolve uv binary from PATH."""
     uv = shutil.which("uv")
-    if uv is None:
-        pytest.skip("uv not found on PATH — skipping builder tests")
+    assert uv is not None, "uv not found on PATH — install uv to run these tests"
+    # shutil.which returns str, so Path(uv) is safe here.
+    # The IDE warns about PathLike on Windows <3.12, but builder.py converts
+    # path_bin_uv to str via f"{path_bin_uv}" before passing to subprocess.run.
     return Path(uv)
 
 
