@@ -50,7 +50,12 @@ Welcome to ``aws_lbd_art_builder_core`` Documentation
 .. image:: https://aws-lbd-art-builder-core.readthedocs.io/en/latest/_static/aws_lbd_art_builder_core-logo.png
     :target: https://aws-lbd-art-builder-core.readthedocs.io/en/latest/
 
-Documentation for ``aws_lbd_art_builder_core``.
+``aws_lbd_art_builder_core`` is the **shared base** in a family of AWS Lambda artifact builder packages. It follows a **1+N design**:
+
+- **1 core package** (this one): tool-agnostic infrastructure — path layouts, S3 layouts, credentials, layer packaging, upload, publish, and Lambda source artifact build.
+- **N tool-specific packages** (``aws_lbd_art_builder_uv``, ``aws_lbd_art_builder_pip``, ``aws_lbd_art_builder_poetry``): each implements Step 1 (dependency installation) and wires the full 4-step Lambda layer workflow.
+
+Core never calls ``pip install``, ``uv sync``, or ``poetry install`` directly — those belong exclusively in the tool-specific sub-packages.
 
 
 .. _install:
