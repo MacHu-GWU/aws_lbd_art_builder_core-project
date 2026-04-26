@@ -8,7 +8,8 @@ used by the Lambda source build workflow:
 
 - :class:`SourcePathLayout` — local filesystem paths under
   ``{dir_project_root}/build/lambda/source/``
-- :class:`SourceS3Layout` — S3 paths under ``{s3dir_lambda}/source/``
+- :class:`SourceS3Layout` — S3 paths whose root is the ``source/``-scoped
+  S3 directory, e.g. ``s3://bucket/path/to/lambda/source/``
 
 Neither class performs I/O; they only compute paths so callers can stay
 decoupled from the hard-coded directory names.
@@ -18,8 +19,10 @@ Relationship to the higher-level ``s3dir_lambda`` prefix
 ``s3dir_lambda`` is a shared parent used by multiple artifact types (source,
 layer, …).  Each type **owns a scoped sub-prefix** so that "delete everything
 under this layout's root" is safe and never touches sibling artifacts.
-Use :meth:`SourceS3Layout.from_s3dir_lambda` to derive the scoped root from
-the shared parent, which is the preferred construction path.
+:class:`SourceS3Layout` is constructed directly with the already-scoped
+``source/`` directory as ``dir_root``.  Use the convenience factory
+:meth:`SourceS3Layout.from_s3dir_lambda` to derive that scoped root
+automatically from the shared ``s3dir_lambda`` parent.
 """
 
 import dataclasses

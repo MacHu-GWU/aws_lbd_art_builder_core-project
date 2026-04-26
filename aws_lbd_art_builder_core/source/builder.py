@@ -6,9 +6,9 @@ Build-step functions for Lambda source deployment artifacts.
 Each function installs the current Python package into a caller-supplied
 target directory (``dir_lambda_source_build``) using a different tool:
 
-- :func:`build_source_artifacts_using_pip` — ``pip install --no-dependencies --target``
-- :func:`build_source_artifacts_using_uv`  — ``uv pip install --no-deps --target``
-- :func:`create_source_zip`               — zip the build dir and return its SHA256
+- :func:`build_source_dir_using_pip` — ``pip install --no-dependencies --target``
+- :func:`build_source_dir_using_uv`  — ``uv pip install --no-deps --target``
+- :func:`create_source_zip`          — zip the build dir and return its SHA256
 
 All three functions are intentionally thin: they accept plain :class:`~pathlib.Path`
 arguments rather than a :class:`~aws_lbd_art_builder_core.source.foundation.SourcePathLayout`

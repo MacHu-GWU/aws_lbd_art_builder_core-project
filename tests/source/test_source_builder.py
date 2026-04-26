@@ -32,7 +32,7 @@ from aws_lbd_art_builder_core.source.builder import (
 # Paths
 # ---------------------------------------------------------------------------
 
-DIR_PROJECT_ROOT = Path(__file__).parent.parent.resolve()
+DIR_PROJECT_ROOT = Path(__file__).parent.parent.parent.resolve()
 PATH_PYPROJECT_TOML = DIR_PROJECT_ROOT / "pyproject.toml"
 
 DIR_TESTS = Path(__file__).parent
