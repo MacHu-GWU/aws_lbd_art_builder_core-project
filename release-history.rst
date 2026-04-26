@@ -24,6 +24,7 @@ x.y.z (Backlog)
 - Removed ``layer_build_tool: LayerBuildToolEnum`` parameter from ``upload_layer_zip_to_s3()`` and ``LambdaLayerVersionPublisher`` — replaced by generic ``path_manifest: Path`` so core never needs to know which tool built the layer.
 - Removed tool-specific properties and methods from ``LayerPathLayout`` (``path_requirements_txt``, ``path_poetry_toml``, ``path_poetry_lock``, ``path_uv_lock``, ``copy_poetry_toml``, ``copy_poetry_lock``, ``copy_uv_lock``, ``get_path_manifest``). Sub-packages should manage their own tool-specific file paths.
 - Restructured ``api.py`` — source and layer sub-module APIs are now exposed as ``source_api`` and ``layer_api`` namespace objects instead of flat re-exports.
+- Drop Python3.10 support.
 
 **Features and Improvements**
 
