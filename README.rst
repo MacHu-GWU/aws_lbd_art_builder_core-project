@@ -57,6 +57,10 @@ Welcome to ``aws_lbd_art_builder_core`` Documentation
 
 Core never calls ``pip install``, ``uv sync``, or ``poetry install`` directly — those belong exclusively in the tool-specific sub-packages.
 
+.. tip::
+
+    If you are using `Claude Code <https://claude.ai/claude-code>`_, run the ``learn-this-project`` agent skill to quickly onboard and understand this project's architecture.
+
 
 .. _install:
 
