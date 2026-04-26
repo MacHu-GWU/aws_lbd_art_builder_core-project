@@ -37,3 +37,4 @@ For full architectural documentation, read the Maintainer Guide RST files:
 - `docs/source/99-Maintainer-Guide/index.rst` — Maintainer Guide table of contents
 - `docs/source/99-Maintainer-Guide/01-Project-Overview/index.rst` — Project overview and goals
 - `docs/source/99-Maintainer-Guide/02-Code-Architect-Design/index.rst` — Complete module map, 4-step workflow details (Steps 2/3/4), source deployment workflow, path/S3 layout managers, Credentials, abstract base classes, public API by audience, and testing philosophy
+- `docs/source/99-Maintainer-Guide/03-Sub-Package-Extension-Guide/index.rst` — How tool-specific sub-packages extend core: what to override (step_2/3/4), full builder example, end-to-end workflow, container builds, key design decisions
