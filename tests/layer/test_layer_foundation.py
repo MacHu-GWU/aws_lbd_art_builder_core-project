@@ -5,18 +5,17 @@ Tests for layer foundation module: Credentials, LayerPathLayout, LayerS3Layout,
 BaseLogger, LayerManifestManager.
 """
 
-import os
-import json
-import hashlib
-from pathlib import Path
-from unittest.mock import patch
-
-import pytest
-
 from aws_lbd_art_builder_core.layer.foundation import Credentials
 from aws_lbd_art_builder_core.layer.foundation import LayerPathLayout
 from aws_lbd_art_builder_core.layer.foundation import BaseLogger
 from aws_lbd_art_builder_core.layer.foundation import LayerManifestManager
+
+import os
+import json
+import hashlib
+from pathlib import Path
+
+import pytest
 
 s3pathlib = pytest.importorskip("s3pathlib")
 
@@ -223,6 +222,45 @@ class TestLayerPathLayout:
     def test_frozen(self):
         with pytest.raises((AttributeError, TypeError)):
             self.layout.path_pyproject_toml = Path("/other/pyproject.toml")
+
+    def test_venv_python_version(self):
+        """Use the real project venv to test venv_python_version."""
+        dir_project_root = Path(__file__).parent.parent.parent.resolve()
+        layout = LayerPathLayout(
+            path_pyproject_toml=dir_project_root / "pyproject.toml",
+        )
+        major, minor, micro = layout.venv_python_version
+        assert major >= 3
+        assert minor >= 0
+        assert micro >= 0
+
+    def test_dir_build_lambda_layer_repo_venv_site_packages(self):
+        """Uses the real project venv to derive the site-packages path."""
+        dir_project_root = Path(__file__).parent.parent.parent.resolve()
+        layout = LayerPathLayout(
+            path_pyproject_toml=dir_project_root / "pyproject.toml",
+        )
+        site_packages = layout.dir_build_lambda_layer_repo_venv_site_packages
+        major, minor, _ = layout.venv_python_version
+        assert f"python{major}.{minor}" in str(site_packages)
+        assert str(site_packages).endswith("site-packages")
+        assert site_packages.is_relative_to(layout.dir_repo)
+
+    def test_clean_removes_build_dir(self, tmp_path):
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text("")
+        layout = LayerPathLayout(path_pyproject_toml=pyproject)
+        layout.mkdirs()
+        assert layout.dir_build_lambda_layer.exists()
+        layout.clean(skip_prompt=True)
+        assert not layout.dir_build_lambda_layer.exists()
+
+    def test_clean_noop_when_dir_not_exists(self, tmp_path):
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text("")
+        layout = LayerPathLayout(path_pyproject_toml=pyproject)
+        # should not raise even if dir doesn't exist
+        layout.clean(skip_prompt=True)
 
     def test_mkdirs(self, tmp_path):
         layout = LayerPathLayout(path_pyproject_toml=tmp_path / "pyproject.toml")

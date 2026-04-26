@@ -27,12 +27,14 @@ import dataclasses
 from pathlib import Path
 from functools import cached_property
 
-from func_args.api import BaseFrozenModel, REQ
+from func_args.api import BaseFrozenModel
+from func_args.api import REQ
 
 from ..typehint import T_PRINTER
 from ..constants import ZFILL
 from ..imports import S3Path
-from ..utils import write_bytes, clean_build_directory
+from ..utils import write_bytes
+from ..utils import clean_build_directory
 
 if T.TYPE_CHECKING:  # pragma: no cover
     from mypy_boto3_s3 import S3Client
