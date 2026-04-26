@@ -1,18 +1,25 @@
 # -*- coding: utf-8 -*-
 
 """
-Lambda layer S3 upload implementation - Step 3 of the layer creation workflow.
+Lambda layer S3 upload — Step 3 of the layer workflow.
 
-This module handles the upload phase of AWS Lambda layer deployment, transferring
-the packaged layer zip file to S3 storage where it can be accessed by AWS Lambda
-for layer creation and publication.
+Uploads the packaged ``layer.zip`` to a staging location in S3 where the
+publish step can pick it up to create a Lambda layer version.
+
+**Why store manifest_md5 in S3 metadata?**
+
+The publish step needs to verify that the ``layer.zip`` sitting in S3 was
+actually built from the *current* dependency manifest on disk. Without this
+check, a stale zip from a previous build could be published by accident.
+By embedding the manifest MD5 at upload time and comparing it at publish
+time, we get a cheap consistency gate.
 """
 
 import typing as T
 from pathlib import Path
 
 from ..typehint import T_PRINTER
-from ..constants import S3MetadataKeyEnum, LayerBuildToolEnum
+from ..constants import S3MetadataKeyEnum
 from ..imports import S3Path
 
 from .foundation import LayerManifestManager
@@ -25,32 +32,27 @@ def upload_layer_zip_to_s3(
     s3_client: "S3Client",
     path_pyproject_toml: Path,
     s3dir_lambda: "S3Path",
-    layer_build_tool: LayerBuildToolEnum,
+    path_manifest: Path,
     verbose: bool = True,
     printer: T_PRINTER = print,
 ):
     """
-    Upload Lambda layer zip file to S3 storage for deployment (Public API).
+    Upload Lambda layer zip file to S3 staging location.
 
-    This function uploads the packaged layer zip file to S3 using an organized
-    directory structure that supports versioning and artifact management. The
-    uploaded artifact becomes available for Lambda layer creation and can be
-    referenced by AWS Lambda service for layer publication.
-
-    :param s3_client: Configured boto3 S3 client with appropriate permissions
-    :param path_pyproject_toml: Path to pyproject.toml file (determines project root and zip location)
+    :param s3_client: Configured boto3 S3 client
+    :param path_pyproject_toml: Path to pyproject.toml (determines project root and zip location)
     :param s3dir_lambda: S3 directory path where Lambda artifacts are stored
-    :param layer_build_tool: Build tool used to create dependencies (pip/poetry/uv)
-    :param verbose: If True, shows detailed upload progress; if False, runs with minimal output
-    :param printer: Function to handle progress messages, defaults to print
+    :param path_manifest: Path to the dependency manifest file (e.g. requirements.txt, uv.lock)
+    :param verbose: If True, shows detailed upload progress
+    :param printer: Function to handle progress messages
     """
     if verbose:
-        printer(f"--- Uploading Lambda Layer zip to S3 ...")
+        printer("--- Uploading Lambda Layer zip to S3 ...")
 
     manifest_manager = LayerManifestManager(
         path_pyproject_toml=path_pyproject_toml,
         s3dir_lambda=s3dir_lambda,
-        layer_build_tool=layer_build_tool,
+        path_manifest=path_manifest,
         s3_client=s3_client,
         printer=printer,
     )
@@ -63,9 +65,6 @@ def upload_layer_zip_to_s3(
         overwrite=True,
         extra_args={
             "ContentType": "application/zip",
-            # Store manifest MD5 hash in S3 object metadata for consistency validation
-            # This enables the publish step to verify that the uploaded layer.zip
-            # corresponds to the current local dependency manifest before layer creation
             "Metadata": {
                 S3MetadataKeyEnum.manifest_md5.value: manifest_manager.manifest_md5,
             },
