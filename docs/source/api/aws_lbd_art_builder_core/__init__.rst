@@ -11,10 +11,10 @@ sub packages and modules
     :maxdepth: 1
 
     layer <layer/__init__>
+    source <source/__init__>
     api <api>
     constants <constants>
     imports <imports>
-    source <source>
     typehint <typehint>
     utils <utils>
     

@@ -35,15 +35,20 @@ Module Map
     ├── typehint.py         # T_PRINTER callable type alias
     ├── imports.py          # Conditional soft imports: S3Path, simple_aws_lambda
     ├── utils.py            # is_match, copy_source_for_lambda_deployment, write_bytes, ...
-    ├── source.py           # Lambda function source artifact build/zip/upload workflow
+    ├── source/             # Lambda function source artifact build/zip/upload workflow
+    │   ├── foundation.py   # SourcePathLayout, SourceS3Layout
+    │   ├── builder.py      # build_source_dir_using_pip/uv, create_source_zip
+    │   ├── upload.py       # upload_source_zip, build_and_upload_source_using_pip/uv
+    │   └── api.py          # Public API exports
     ├── layer/
     │   ├── foundation.py   # Credentials, LayerPathLayout, LayerS3Layout,
     │   │                   # BaseLogger, LayerManifestManager
-    │   ├── builder.py      # BasedLambdaLayerLocalBuilder,
-    │   │                   # BasedLambdaLayerContainerBuilder  (abstract bases)
-    │   ├── package.py      # move_to_dir_python, create_layer_zip_file, LambdaLayerZipper
+    │   ├── builder.py      # BaseLambdaLayerLocalBuilder,
+    │   │                   # BaseLambdaLayerContainerBuilder  (abstract bases)
+    │   ├── package.py      # move_to_dir_python, create_layer_zip_file
     │   ├── upload.py       # upload_layer_zip_to_s3
-    │   └── publish.py      # LambdaLayerVersionPublisher, LayerDeployment
+    │   ├── publish.py      # LambdaLayerVersionPublisher, LayerDeployment
+    │   └── api.py          # Public API exports
     └── vendor/
         ├── better_pathlib.py  # temp_cwd context manager
         ├── hashes.py          # hashes (MD5/SHA256 helper)
@@ -66,18 +71,16 @@ Steps 2–4 are fully implemented in core. Sub-packages only implement Step 1.
 
 Step 2 — Package
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-:class:`~aws_lbd_art_builder_core.layer.package.LambdaLayerZipper` — core inputs:
-``path_pyproject_toml``, ``layer_build_tool``, ``ignore_package_list``, ``verbose``.
+Two tool-agnostic functions:
 
-- For ``uv``/``poetry``: calls :func:`~aws_lbd_art_builder_core.layer.package.move_to_dir_python` to relocate the venv's ``site-packages/`` → ``artifacts/python/``
-- For ``pip``: packages are already in place; no move needed
-- Creates ``build/lambda/layer/layer.zip`` with max compression, excluding :data:`~aws_lbd_art_builder_core.layer.package.default_ignore_package_list` (boto3, botocore, setuptools, pytest, …)
+- :func:`~aws_lbd_art_builder_core.layer.package.move_to_dir_python` — relocates ``site-packages/`` → ``artifacts/python/``. Called by sub-packages whose tool installs into a venv (uv, poetry). Pip-based builders skip this since ``pip install --target`` writes directly to ``python/``.
+- :func:`~aws_lbd_art_builder_core.layer.package.create_layer_zip_file` — creates ``build/lambda/layer/layer.zip`` with max compression, excluding :data:`~aws_lbd_art_builder_core.layer.package.default_ignore_package_list` (boto3, botocore, setuptools, pytest, …)
 
 
 Step 3 — Upload
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 :func:`~aws_lbd_art_builder_core.layer.upload.upload_layer_zip_to_s3` — core inputs:
-``s3_client``, ``path_pyproject_toml``, ``s3dir_lambda``, ``layer_build_tool``.
+``s3_client``, ``path_pyproject_toml``, ``s3dir_lambda``, ``path_manifest``.
 
 - Uploads ``layer.zip`` to :attr:`~aws_lbd_art_builder_core.layer.foundation.LayerS3Layout.s3path_temp_layer_zip` (``${s3dir_lambda}/layer/layer.zip``)
 - Stores the **manifest MD5** hash in S3 object metadata (key: ``S3MetadataKeyEnum.manifest_md5``) so Step 4 can verify consistency
@@ -86,7 +89,7 @@ Step 3 — Upload
 Step 4 — Publish
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 :class:`~aws_lbd_art_builder_core.layer.publish.LambdaLayerVersionPublisher` — core inputs:
-``path_pyproject_toml``, ``s3dir_lambda``, ``layer_build_tool``, ``s3_client``,
+``path_pyproject_toml``, ``s3dir_lambda``, ``path_manifest``, ``s3_client``,
 ``layer_name``, ``lambda_client``, ``publish_layer_version_kwargs``.
 
 Three-stage preflight before publishing:
@@ -146,8 +149,6 @@ LayerPathLayout (:mod:`aws_lbd_art_builder_core.layer.foundation`)
    * - :attr:`~aws_lbd_art_builder_core.layer.foundation.LayerPathLayout.path_private_repository_credentials_in_local`
      - ``{build/lambda}/private-repository-credentials.json``
 
-:meth:`~aws_lbd_art_builder_core.layer.foundation.LayerPathLayout.get_path_manifest` returns ``requirements.txt``, ``poetry.lock``, or ``uv.lock`` depending on the tool.
-
 :meth:`~aws_lbd_art_builder_core.layer.foundation.LayerPathLayout.get_path_in_container` converts any local path to its Docker ``/var/task/...`` equivalent.
 
 
@@ -165,7 +166,7 @@ LayerS3Layout (:mod:`aws_lbd_art_builder_core.layer.foundation`)
      - ``{s3dir}/layer/layer.zip``
    * - :meth:`~aws_lbd_art_builder_core.layer.foundation.LayerS3Layout.get_s3dir_layer_version` ``(n)``
      - ``{s3dir}/layer/000001/`` (zero-padded with ``ZFILL=6``)
-   * - :meth:`~aws_lbd_art_builder_core.layer.foundation.LayerS3Layout.get_s3path_layer_uv_lock` ``(n)``
+   * - :meth:`~aws_lbd_art_builder_core.layer.foundation.LayerS3Layout.get_s3path_layer_manifest` ``(n, "uv.lock")``
      - ``{s3dir}/layer/000001/uv.lock``
 
 
@@ -186,12 +187,12 @@ Key derived values and methods:
 Abstract Base Classes for Sub-packages (:mod:`aws_lbd_art_builder_core.layer.builder`)
 ------------------------------------------------------------------------------
 
-BasedLambdaLayerLocalBuilder
+BaseLambdaLayerLocalBuilder
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-:class:`~aws_lbd_art_builder_core.layer.builder.BasedLambdaLayerLocalBuilder` — fields:
-``path_pyproject_toml``, ``credentials``, ``skip_prompt``, ``_build_tool``.
+:class:`~aws_lbd_art_builder_core.layer.builder.BaseLambdaLayerLocalBuilder` — fields:
+``path_pyproject_toml``, ``credentials``, ``skip_prompt``.
 
-Sub-packages **override** :meth:`~aws_lbd_art_builder_core.layer.builder.BasedLambdaLayerLocalBuilder.step_3_execute_build` with tool-specific installation logic. The inherited 4-step ``run()`` sequence:
+Sub-packages **override** :meth:`~aws_lbd_art_builder_core.layer.builder.BaseLambdaLayerLocalBuilder.step_3_execute_build` with tool-specific installation logic. The inherited 4-step ``run()`` sequence:
 
 1. ``step_1_preflight_check`` — print build info
 2. ``step_2_prepare_environment`` — cleans ``dir_build_lambda_layer``, creates ``dir_repo`` and ``dir_python``
@@ -199,18 +200,18 @@ Sub-packages **override** :meth:`~aws_lbd_art_builder_core.layer.builder.BasedLa
 4. ``step_4_finalize_artifacts`` — **optionally override** (e.g. call :func:`~aws_lbd_art_builder_core.layer.package.move_to_dir_python` for uv/poetry)
 
 
-BasedLambdaLayerContainerBuilder
+BaseLambdaLayerContainerBuilder
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-:class:`~aws_lbd_art_builder_core.layer.builder.BasedLambdaLayerContainerBuilder` — fields:
+:class:`~aws_lbd_art_builder_core.layer.builder.BaseLambdaLayerContainerBuilder` — fields:
 ``path_pyproject_toml``, ``py_ver_major``, ``py_ver_minor``, ``is_arm``, ``path_script``, ``credentials``.
 
 Sub-packages supply ``path_script`` — the ``_build_lambda_layer_using_*_in_container.py`` file that runs inside Docker.
 
 Key derived properties:
 
-- :attr:`~aws_lbd_art_builder_core.layer.builder.BasedLambdaLayerContainerBuilder.image_uri` → ``public.ecr.aws/sam/build-python{M}.{m}:latest-{arch}``
-- :attr:`~aws_lbd_art_builder_core.layer.builder.BasedLambdaLayerContainerBuilder.platform` → ``linux/amd64`` or ``linux/arm64``
-- :attr:`~aws_lbd_art_builder_core.layer.builder.BasedLambdaLayerContainerBuilder.docker_run_args` → full ``docker run`` command list (mounts project root to ``/var/task``)
+- :attr:`~aws_lbd_art_builder_core.layer.builder.BaseLambdaLayerContainerBuilder.image_uri` → ``public.ecr.aws/sam/build-python{M}.{m}:latest-{arch}``
+- :attr:`~aws_lbd_art_builder_core.layer.builder.BaseLambdaLayerContainerBuilder.platform` → ``linux/amd64`` or ``linux/arm64``
+- :attr:`~aws_lbd_art_builder_core.layer.builder.BaseLambdaLayerContainerBuilder.docker_run_args` → full ``docker run`` command list (mounts project root to ``/var/task``)
 
 Step 2 copies the build script and dumps credentials JSON; Step 3 executes ``docker run``.
 
@@ -223,10 +224,10 @@ Public API by Audience (:mod:`aws_lbd_art_builder_core.api`)
 .. code-block:: python
 
     from aws_lbd_art_builder_core.api import (
-        Credentials, LayerBuildToolEnum,
+        Credentials,
         copy_source_for_lambda_deployment,
-        build_package_upload_source_artifacts, BuildSourceArtifactsResult,
-        LambdaLayerZipper, default_ignore_package_list,
+        build_and_upload_source_using_pip, BuildAndUploadSourceResult,
+        default_ignore_package_list,
         upload_layer_zip_to_s3,
         LambdaLayerVersionPublisher, LayerDeployment,
     )
@@ -236,14 +237,16 @@ Public API by Audience (:mod:`aws_lbd_art_builder_core.api`)
 .. code-block:: python
 
     from aws_lbd_art_builder_core.api import (
-        BasedLambdaLayerLocalBuilder, BasedLambdaLayerContainerBuilder,
+        BaseLambdaLayerLocalBuilder, BaseLambdaLayerContainerBuilder,
         LayerPathLayout, move_to_dir_python,
         temp_cwd,                               # for container build scripts
         # pass-through to users:
-        Credentials, LayerBuildToolEnum,
-        LambdaLayerZipper, upload_layer_zip_to_s3,
+        Credentials,
+        upload_layer_zip_to_s3,
         LambdaLayerVersionPublisher, LayerDeployment,
     )
+
+
 
 
 Testing Philosophy
@@ -260,13 +263,17 @@ Core has **unit tests only** — no integration tests. Core never invokes pip/uv
      - :func:`~aws_lbd_art_builder_core.utils.is_match`, :func:`~aws_lbd_art_builder_core.utils.copy_source_for_lambda_deployment`
    * - ``tests/test_source.py``
      - :class:`~aws_lbd_art_builder_core.source.SourceS3Layout` path construction (skipped if ``s3pathlib`` not installed)
-   * - ``tests/test_layer_foundation.py``
-     - :class:`~aws_lbd_art_builder_core.layer.foundation.LayerPathLayout` paths, :class:`~aws_lbd_art_builder_core.layer.foundation.LayerS3Layout` S3 paths
-   * - ``tests/test_credentials.py``
-     - All :class:`~aws_lbd_art_builder_core.layer.foundation.Credentials` methods (pure logic + env vars + JSON roundtrip)
-   * - ``tests/test_layer_package.py``
-     - :func:`~aws_lbd_art_builder_core.layer.package.move_to_dir_python` (filesystem only)
-   * - ``tests/test_container_builder.py``
-     - :class:`~aws_lbd_art_builder_core.layer.builder.BasedLambdaLayerContainerBuilder` pure properties (image URI, platform, docker args)
+   * - ``tests/layer/test_layer_foundation.py``
+     - :class:`~aws_lbd_art_builder_core.layer.foundation.Credentials`, :class:`~aws_lbd_art_builder_core.layer.foundation.LayerPathLayout`, :class:`~aws_lbd_art_builder_core.layer.foundation.LayerS3Layout`, :class:`~aws_lbd_art_builder_core.layer.foundation.BaseLogger`, :class:`~aws_lbd_art_builder_core.layer.foundation.LayerManifestManager`
+   * - ``tests/layer/test_layer_builder.py``
+     - :class:`~aws_lbd_art_builder_core.layer.builder.BaseLambdaLayerLocalBuilder` orchestration order, :class:`~aws_lbd_art_builder_core.layer.builder.BaseLambdaLayerContainerBuilder` computed properties (image URI, platform, docker args)
+   * - ``tests/layer/test_layer_package.py``
+     - :func:`~aws_lbd_art_builder_core.layer.package.move_to_dir_python`, :func:`~aws_lbd_art_builder_core.layer.package.create_layer_zip_file`
+   * - ``tests/layer/test_layer_upload.py``
+     - :func:`~aws_lbd_art_builder_core.layer.upload.upload_layer_zip_to_s3` (moto mock S3)
+   * - ``tests/layer/test_layer_publish.py``
+     - :class:`~aws_lbd_art_builder_core.layer.publish.LambdaLayerVersionPublisher` preflight checks and full workflow, :class:`~aws_lbd_art_builder_core.layer.publish.LayerDeployment`
+   * - ``tests/layer/test_layer_api.py``
+     - Import verification for all public API exports
 
-Subprocess-calling functions (``create_layer_zip_file``, ``build_source_artifacts_using_pip``) and all AWS functions (``upload_layer_zip_to_s3``, ``LambdaLayerVersionPublisher``) are integration-level and belong in tool-specific sub-packages' test suites.
+Subprocess-calling functions (``create_layer_zip_file``) and all AWS functions (``upload_layer_zip_to_s3``, ``LambdaLayerVersionPublisher``) are tested with moto mocks in the ``tests/layer/`` directory. Tool-specific build logic (pip/uv/poetry installation) belongs in sub-packages' test suites.

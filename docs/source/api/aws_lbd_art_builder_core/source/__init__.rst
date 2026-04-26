@@ -1,7 +1,7 @@
-layer
-=====
+source
+======
 
-.. automodule:: aws_lbd_art_builder_core.layer
+.. automodule:: aws_lbd_art_builder_core.source
     :members:
 
 sub packages and modules
@@ -13,7 +13,5 @@ sub packages and modules
     api <api>
     builder <builder>
     foundation <foundation>
-    package <package>
-    publish <publish>
     upload <upload>
     
