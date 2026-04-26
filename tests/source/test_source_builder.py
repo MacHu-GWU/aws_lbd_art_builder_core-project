@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
 """
-Integration tests for builder functions: build_source_artifacts_using_pip,
-build_source_artifacts_using_uv, and create_source_zip.
+Integration tests for builder functions: build_source_dir_using_pip,
+build_source_dir_using_uv, and create_source_zip.
 
 Each build tool gets its own SourcePathLayout so the outputs are isolated:
 
@@ -23,8 +23,8 @@ import pytest
 
 from aws_lbd_art_builder_core.source.foundation import SourcePathLayout
 from aws_lbd_art_builder_core.source.builder import (
-    build_source_artifacts_using_pip,
-    build_source_artifacts_using_uv,
+    build_source_dir_using_pip,
+    build_source_dir_using_uv,
     create_source_zip,
 )
 
@@ -66,7 +66,7 @@ def path_bin_uv() -> Path:
 @pytest.fixture(scope="module")
 def pip_build_dir(path_bin_pip) -> Path:
     """Run pip build once for the whole module; return dir_build."""
-    build_source_artifacts_using_pip(
+    build_source_dir_using_pip(
         path_bin_pip=path_bin_pip,
         path_pyproject_toml=PATH_PYPROJECT_TOML,
         dir_lambda_source_build=LAYOUT_PIP.dir_build,
@@ -79,7 +79,7 @@ def pip_build_dir(path_bin_pip) -> Path:
 @pytest.fixture(scope="module")
 def uv_build_dir(path_bin_uv) -> Path:
     """Run uv build once for the whole module; return dir_build."""
-    build_source_artifacts_using_uv(
+    build_source_dir_using_uv(
         path_bin_uv=path_bin_uv,
         path_pyproject_toml=PATH_PYPROJECT_TOML,
         dir_lambda_source_build=LAYOUT_UV.dir_build,
@@ -119,10 +119,10 @@ def _assert_build_dir(build_dir: Path):
 
 
 # ---------------------------------------------------------------------------
-# Tests: build_source_artifacts_using_pip
+# Tests: build_source_dir_using_pip
 # ---------------------------------------------------------------------------
 
-class TestBuildSourceArtifactsUsingPip:
+class TestBuildSourceDirUsingPip:
     def test_build_dir_structure(self, pip_build_dir):
         _assert_build_dir(pip_build_dir)
 
@@ -132,10 +132,10 @@ class TestBuildSourceArtifactsUsingPip:
 
 
 # ---------------------------------------------------------------------------
-# Tests: build_source_artifacts_using_uv
+# Tests: build_source_dir_using_uv
 # ---------------------------------------------------------------------------
 
-class TestBuildSourceArtifactsUsingUv:
+class TestBuildSourceDirUsingUv:
     def test_build_dir_structure(self, uv_build_dir):
         _assert_build_dir(uv_build_dir)
 

@@ -38,7 +38,7 @@ from ..typehint import T_PRINTER
 from ..utils import clean_build_directory
 
 
-def build_source_artifacts_using_pip(
+def build_source_dir_using_pip(
     path_bin_pip: Path,
     path_pyproject_toml: Path,
     dir_lambda_source_build: Path,
@@ -72,7 +72,7 @@ def build_source_artifacts_using_pip(
     :param printer: Callable used for log output (default: :func:`print`).
     """
     if verbose:
-        printer("--- Building Lambda source artifacts using pip ...")
+        printer("--- Building Lambda source dir using pip ...")
         printer(f"{path_bin_pip = !s}")
         printer(f"{path_pyproject_toml = !s}")
         printer(f"{dir_lambda_source_build = !s}")
@@ -96,7 +96,7 @@ def build_source_artifacts_using_pip(
     subprocess.run(args, check=True)
 
 
-def build_source_artifacts_using_uv(
+def build_source_dir_using_uv(
     path_bin_uv: Path,
     path_pyproject_toml: Path,
     dir_lambda_source_build: Path,
@@ -133,7 +133,7 @@ def build_source_artifacts_using_uv(
     :param printer: Callable used for log output (default: :func:`print`).
     """
     if verbose:
-        printer("--- Building Lambda source artifacts using uv ...")
+        printer("--- Building Lambda source dir using uv ...")
         printer(f"{path_bin_uv = !s}")
         printer(f"{path_pyproject_toml = !s}")
         printer(f"{dir_lambda_source_build = !s}")
