@@ -1,25 +1,31 @@
 # -*- coding: utf-8 -*-
 
 """
-Lambda layer publication implementation - Step 4 of the layer creation workflow.
+Lambda layer publication — Step 4 of the layer workflow.
 
-This module handles the publication phase of AWS Lambda layer deployment, taking
-the uploaded layer zip file from S3 and creating versioned Lambda layer resources.
+Takes the uploaded ``layer.zip`` from S3 and creates a versioned Lambda layer
+resource via the AWS API.
 
-**Publication Process:**
-    The module implements smart publishing that only creates new layer versions when
-    dependencies have actually changed, determined by comparing local dependency
-    manifests against stored versions from previous publications.
+**Why smart publishing?**
+
+Creating a Lambda layer version is a non-reversible, append-only operation
+(versions can be deleted but not overwritten). Publishing identical
+dependencies as a new version wastes version numbers and forces downstream
+stacks to update for no reason. This module compares the local dependency
+manifest against the previously stored one and skips the publish when nothing
+has changed.
 """
 
 import typing as T
 import dataclasses
 from functools import cached_property
 
-from func_args.api import BaseFrozenModel, REQ
+from func_args.api import BaseFrozenModel
+from func_args.api import REQ
 
 from ..constants import S3MetadataKeyEnum
-from ..imports import S3Path, simple_aws_lambda
+from ..imports import S3Path
+from ..imports import simple_aws_lambda
 
 from .foundation import LayerManifestManager
 
@@ -31,21 +37,17 @@ if T.TYPE_CHECKING:  # pragma: no cover
 @dataclasses.dataclass(frozen=True)
 class LambdaLayerVersionPublisher(LayerManifestManager):
     """
-    Command class for intelligent Lambda layer version publishing (Internal API).
+    Command class for intelligent Lambda layer version publishing.
 
-    This class implements the layer publication workflow with dependency change detection,
-    ensuring new layer versions are only created when dependencies have actually changed.
-    It follows the Command Pattern established by other builder classes.
+    Inherits :class:`~aws_lbd_art_builder_core.layer.foundation.LayerManifestManager`
+    for manifest handling and adds layer publication logic.
 
-    **Not for direct use**: This is an internal command class. Use the public function
-    :func:`publish_layer_version` instead.
+    **Why Command Pattern here?**
 
-    **Key Responsibilities:**
-
-    - **Change Detection**: Compare local manifests with previously published versions
-    - **Layer Publication**: Create new Lambda layer versions from S3 artifacts
-    - **Manifest Storage**: Backup dependency manifests for future comparisons
-    - **Version Management**: Handle layer version incrementation automatically
+    Publishing involves multiple AWS API calls with shared state (layer name,
+    clients, manifest path, S3 layout). Keeping these as fields on a frozen
+    dataclass makes the publisher easy to construct, inspect, and test —
+    same rationale as the builder classes.
     """
 
     # fmt: off
@@ -74,7 +76,7 @@ class LambdaLayerVersionPublisher(LayerManifestManager):
 
     def step_2_publish_layer_version(self) -> "LayerDeployment":
         """
-        Execute the layer publication workflow, creating a new Lambda layer version
+        Execute the layer publication workflow, creating a new Lambda layer version.
         """
         self.log("--- Step 2 - Publish Lambda Layer Version")
         layer_version, layer_version_arn = self.step_2_1_run_publish_layer_version_api()
@@ -92,8 +94,7 @@ class LambdaLayerVersionPublisher(LayerManifestManager):
     # --- step_1_preflight_check sub-steps
     def step_1_1_ensure_layer_zip_exists(self):
         """
-        Verifies that the layer.zip file was successfully uploaded to S3 during
-        the upload phase and is available for Lambda layer creation.
+        Verify that the layer.zip file was successfully uploaded to S3.
         """
         s3path = self.s3_layout.s3path_temp_layer_zip
         self.log(f"--- Step 1.1 - Verify layer.zip exists in S3 at {s3path.uri}...")
@@ -104,7 +105,7 @@ class LambdaLayerVersionPublisher(LayerManifestManager):
                 f"Please run the upload step first to create the layer.zip in S3."
             )
         else:
-            self.log("✅ Layer zip file found in S3.")
+            self.log("Layer zip file found in S3.")
 
     def is_layer_zip_exists(self) -> bool:
         """
@@ -129,12 +130,11 @@ class LambdaLayerVersionPublisher(LayerManifestManager):
                 f"Please re-run the upload step to sync the layer.zip with current dependencies."
             )
         else:
-            self.log("✅ Layer zip file is consistent with current manifest.")
+            self.log("Layer zip file is consistent with current manifest.")
 
     def is_layer_zip_consistent(self) -> bool:
         """
-        Compares the manifest MD5 hash stored in the S3 layer.zip metadata
-        with the MD5 hash of the current local manifest file.
+        Compare the manifest MD5 stored in S3 metadata with the local manifest.
 
         :return: True if uploaded layer.zip matches current manifest, False otherwise
         """
@@ -147,8 +147,11 @@ class LambdaLayerVersionPublisher(LayerManifestManager):
 
     def step_1_3_ensure_dependencies_have_changed(self):
         """
-        Check if the local dependency manifest has changed since the last publication.
-        This is the core intelligence that prevents unnecessary layer version creation.
+        Check if dependencies have changed since the last publication.
+
+        This is the core intelligence that prevents unnecessary layer version
+        creation — skips publishing when the manifest is identical to the
+        previously published one.
         """
         self.log(
             "--- Step 1.3 - Check if dependencies have changed since last publication"
@@ -157,7 +160,7 @@ class LambdaLayerVersionPublisher(LayerManifestManager):
         if not has_changed:
             raise ValueError("Dependencies unchanged since last publication - skipping")
         else:
-            self.log("✅ Dependencies have changed - proceeding with publishing.")
+            self.log("Dependencies have changed - proceeding with publishing.")
 
     def has_dependency_manifest_changed(self) -> bool:
         """
@@ -243,11 +246,7 @@ class LambdaLayerVersionPublisher(LayerManifestManager):
 @dataclasses.dataclass(frozen=True)
 class LayerDeployment(BaseFrozenModel):
     """
-    Data class representing a completed layer deployment (Public API).
-
-    This immutable data class encapsulates all the key information about a
-    successfully published Lambda layer version, providing a complete record
-    of the deployment for downstream operations.
+    Immutable record of a completed layer deployment.
     """
 
     layer_name: str = dataclasses.field(default=REQ)

@@ -11,3 +11,5 @@ from .package import move_to_dir_python
 from .package import default_ignore_package_list
 from .package import create_layer_zip_file
 from .upload import upload_layer_zip_to_s3
+from .publish import LambdaLayerVersionPublisher
+from .publish import LayerDeployment
