@@ -56,11 +56,12 @@ dependencies = [
 # IMPORTANT: all optional dependencies has to be compatible with the "requires-python" field
 # ------------------------------------------------------------------------------
 [project.optional-dependencies]
+# Note: also install these in CI test
 upload = [
     "boto3>=1.42.9,<2.0.0",
     "s3pathlib>=2.0.1,<3.0.0",
 ]
-
+# Note: also install these in CI test
 publish = [
     "boto3>=1.42.9,<2.0.0",
     "s3pathlib>=2.0.1,<3.0.0",
