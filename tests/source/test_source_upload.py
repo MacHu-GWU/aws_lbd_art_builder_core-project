@@ -1,38 +1,30 @@
 # -*- coding: utf-8 -*-
 
 """
-Integration tests for upload functions: upload_source_zip,
-build_and_upload_source_using_pip, build_and_upload_source_using_uv.
+Tests for upload functions: upload_source_zip, BuildAndUploadSourceResult.
 
-Each build tool gets its own SourcePathLayout so the outputs are isolated:
+Uses BaseMockAwsTest so all S3 calls hit moto in-memory rather than real AWS.
+The uv build and zip are created once in setup_class_post_hook so the upload
+tests run against a real local zip file.
 
-    tests/build/lambda/source/using_pip/build/   ← pip install target
-    tests/build/lambda/source/using_pip/source.zip
-    tests/build/lambda/source/using_uv/build/    ← uv install target
-    tests/build/lambda/source/using_uv/source.zip
+Build output is kept on disk after the run for manual inspection:
 
-Directories are left on disk after the test run so the developer can inspect
-them.  They are cleaned at the start of each run (skip_prompt=True).
+    tests/source/build/lambda/source/using_uv/build/   ← uv install target
+    tests/source/build/lambda/source/using_uv/source.zip
 """
 
 import shutil
-import zipfile
 from pathlib import Path
 
 import pytest
 
-from aws_lbd_art_builder_core.source.foundation import SourcePathLayout
-from aws_lbd_art_builder_core.source.builder import (
-    build_source_dir_using_pip,
-    build_source_dir_using_uv,
-    create_source_zip,
-)
-from aws_lbd_art_builder_core.source.upload import (
-    upload_source_zip,
-    BuildAndUploadSourceResult,
-    build_and_upload_source_using_pip,
-    build_and_upload_source_using_uv,
-)
+from s3pathlib import S3Path
+
+from aws_lbd_art_builder_core.tests.mock_aws import BaseMockAwsTest
+from aws_lbd_art_builder_core.constants import S3MetadataKeyEnum
+from aws_lbd_art_builder_core.source.foundation import SourcePathLayout, SourceS3Layout
+from aws_lbd_art_builder_core.source.builder import build_source_dir_using_uv, create_source_zip
+from aws_lbd_art_builder_core.source.upload import upload_source_zip, BuildAndUploadSourceResult
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -40,66 +32,177 @@ from aws_lbd_art_builder_core.source.upload import (
 
 DIR_PROJECT_ROOT = Path(__file__).parent.parent.parent.resolve()
 PATH_PYPROJECT_TOML = DIR_PROJECT_ROOT / "pyproject.toml"
-
 DIR_TESTS = Path(__file__).parent
 
-LAYOUT_PIP = SourcePathLayout(
-    dir_root=DIR_TESTS / "build" / "lambda" / "source" / "using_pip"
-)
 LAYOUT_UV = SourcePathLayout(
     dir_root=DIR_TESTS / "build" / "lambda" / "source" / "using_uv"
 )
 
 # ---------------------------------------------------------------------------
-# Fixtures
+# Tests: upload_source_zip
 # ---------------------------------------------------------------------------
 
-@pytest.fixture(scope="module")
-def path_bin_pip() -> Path:
-    return DIR_PROJECT_ROOT / ".venv" / "bin" / "pip"
+class TestUploadSourceZip(BaseMockAwsTest):
+    use_mock = True
 
+    BUCKET = "test-lambda-bucket"
+    SOURCE_VERSION = "0.1.0"
 
-@pytest.fixture(scope="module")
-def path_bin_uv() -> Path:
-    uv = shutil.which("uv")
-    assert uv is not None, "uv not found on PATH — install uv to run these tests"
-    return Path(uv)
+    s3dir_source: S3Path = None
+    source_sha256: str = None
 
+    @classmethod
+    def setup_class_post_hook(cls):
+        # step 1: build source dir using uv
+        path_bin_uv = shutil.which("uv")
+        assert path_bin_uv is not None, "uv not found on PATH"
+        build_source_dir_using_uv(
+            path_bin_uv=Path(path_bin_uv),
+            path_pyproject_toml=PATH_PYPROJECT_TOML,
+            dir_lambda_source_build=LAYOUT_UV.dir_build,
+            skip_prompt=True,
+            verbose=True,
+        )
+        # step 2: create zip and capture sha256
+        cls.source_sha256 = create_source_zip(
+            dir_lambda_source_build=LAYOUT_UV.dir_build,
+            path_source_zip=LAYOUT_UV.path_source_zip,
+            verbose=True,
+        )
+        # step 3: create mock S3 bucket and set up s3dir_source
+        cls.create_s3_bucket(cls.BUCKET)
+        cls.s3dir_source = S3Path(f"{cls.BUCKET}/lambda/my-func/source/")
 
-@pytest.fixture(scope="module")
-def pip_build_dir(path_bin_pip) -> Path:
-    """Run pip build once for the whole module; return dir_build."""
-    build_source_dir_using_pip(
-        path_bin_pip=path_bin_pip,
-        path_pyproject_toml=PATH_PYPROJECT_TOML,
-        dir_lambda_source_build=LAYOUT_PIP.dir_build,
-        skip_prompt=True,
-        verbose=True,
-    )
-    return LAYOUT_PIP.dir_build
+    # ------------------------------------------------------------------
+    # Return value
+    # ------------------------------------------------------------------
 
+    def test_returns_correct_s3path(self):
+        s3path = upload_source_zip(
+            s3_client=self.s3_client,
+            source_version=self.SOURCE_VERSION,
+            source_sha256=self.source_sha256,
+            path_source_zip=LAYOUT_UV.path_source_zip,
+            s3dir_source=self.s3dir_source,
+            verbose=False,
+        )
+        assert s3path.basename == "source.zip"
+        expected_key = f"lambda/my-func/source/{self.SOURCE_VERSION}/{self.source_sha256}/source.zip"
+        assert s3path.key == expected_key
 
-@pytest.fixture(scope="module")
-def uv_build_dir(path_bin_uv) -> Path:
-    """Run uv build once for the whole module; return dir_build."""
-    build_source_dir_using_uv(
-        path_bin_uv=path_bin_uv,
-        path_pyproject_toml=PATH_PYPROJECT_TOML,
-        dir_lambda_source_build=LAYOUT_UV.dir_build,
-        skip_prompt=True,
-        verbose=True,
-    )
-    return LAYOUT_UV.dir_build
+    # ------------------------------------------------------------------
+    # Object existence
+    # ------------------------------------------------------------------
 
+    def test_object_exists_in_s3(self):
+        s3path = upload_source_zip(
+            s3_client=self.s3_client,
+            source_version=self.SOURCE_VERSION,
+            source_sha256=self.source_sha256,
+            path_source_zip=LAYOUT_UV.path_source_zip,
+            s3dir_source=self.s3dir_source,
+            verbose=False,
+        )
+        assert s3path.exists(bsm=self.s3_client)
 
-@pytest.fixture(scope="module")
-def uv_zip_sha256(uv_build_dir) -> str:
-    """Run create_source_zip on the uv build; return the sha256."""
-    return create_source_zip(
-        dir_lambda_source_build=LAYOUT_UV.dir_build,
-        path_source_zip=LAYOUT_UV.path_source_zip,
-        verbose=True,
-    )
+    # ------------------------------------------------------------------
+    # Metadata
+    # ------------------------------------------------------------------
+
+    def test_metadata_contains_source_version(self):
+        s3path = upload_source_zip(
+            s3_client=self.s3_client,
+            source_version=self.SOURCE_VERSION,
+            source_sha256=self.source_sha256,
+            path_source_zip=LAYOUT_UV.path_source_zip,
+            s3dir_source=self.s3dir_source,
+            verbose=False,
+        )
+        head = self.s3_client.head_object(Bucket=s3path.bucket, Key=s3path.key)
+        metadata = head["Metadata"]
+        assert metadata[S3MetadataKeyEnum.source_version] == self.SOURCE_VERSION
+
+    def test_metadata_contains_source_sha256(self):
+        s3path = upload_source_zip(
+            s3_client=self.s3_client,
+            source_version=self.SOURCE_VERSION,
+            source_sha256=self.source_sha256,
+            path_source_zip=LAYOUT_UV.path_source_zip,
+            s3dir_source=self.s3dir_source,
+            verbose=False,
+        )
+        head = self.s3_client.head_object(Bucket=s3path.bucket, Key=s3path.key)
+        metadata = head["Metadata"]
+        assert metadata[S3MetadataKeyEnum.source_sha256] == self.source_sha256
+
+    def test_custom_metadata_is_merged(self):
+        s3path = upload_source_zip(
+            s3_client=self.s3_client,
+            source_version=self.SOURCE_VERSION,
+            source_sha256=self.source_sha256,
+            path_source_zip=LAYOUT_UV.path_source_zip,
+            s3dir_source=self.s3dir_source,
+            metadata={"custom_key": "custom_value"},
+            verbose=False,
+        )
+        head = self.s3_client.head_object(Bucket=s3path.bucket, Key=s3path.key)
+        metadata = head["Metadata"]
+        assert metadata["custom_key"] == "custom_value"
+        # built-in keys must still be present
+        assert S3MetadataKeyEnum.source_version in metadata
+        assert S3MetadataKeyEnum.source_sha256 in metadata
+
+    # ------------------------------------------------------------------
+    # Content type
+    # ------------------------------------------------------------------
+
+    def test_content_type_is_zip(self):
+        s3path = upload_source_zip(
+            s3_client=self.s3_client,
+            source_version=self.SOURCE_VERSION,
+            source_sha256=self.source_sha256,
+            path_source_zip=LAYOUT_UV.path_source_zip,
+            s3dir_source=self.s3dir_source,
+            verbose=False,
+        )
+        head = self.s3_client.head_object(Bucket=s3path.bucket, Key=s3path.key)
+        assert head["ContentType"] == "application/zip"
+
+    def test_tags_are_set(self):
+        s3path = upload_source_zip(
+            s3_client=self.s3_client,
+            source_version=self.SOURCE_VERSION,
+            source_sha256=self.source_sha256,
+            path_source_zip=LAYOUT_UV.path_source_zip,
+            s3dir_source=self.s3dir_source,
+            tags={"env": "test", "team": "infra"},
+            verbose=False,
+        )
+        resp = self.s3_client.get_object_tagging(Bucket=s3path.bucket, Key=s3path.key)
+        tag_map = {t["Key"]: t["Value"] for t in resp["TagSet"]}
+        assert tag_map["env"] == "test"
+        assert tag_map["team"] == "infra"
+
+    # ------------------------------------------------------------------
+    # S3 path structure matches SourceS3Layout
+    # ------------------------------------------------------------------
+
+    def test_s3path_matches_layout(self):
+        """upload_source_zip must place the object exactly where SourceS3Layout says."""
+        s3path = upload_source_zip(
+            s3_client=self.s3_client,
+            source_version=self.SOURCE_VERSION,
+            source_sha256=self.source_sha256,
+            path_source_zip=LAYOUT_UV.path_source_zip,
+            s3dir_source=self.s3dir_source,
+            verbose=False,
+        )
+        layout = SourceS3Layout(dir_root=self.s3dir_source)
+        expected = layout.get_s3path_source_zip(
+            source_version=self.SOURCE_VERSION,
+            source_sha256=self.source_sha256,
+        )
+        assert s3path.uri == expected.uri
 
 
 # ---------------------------------------------------------------------------
@@ -107,14 +210,15 @@ def uv_zip_sha256(uv_build_dir) -> str:
 # ---------------------------------------------------------------------------
 
 class TestBuildAndUploadSourceResult:
-    def test_fields(self, uv_zip_sha256):
-        from s3pathlib import S3Path
+    def test_fields(self):
+        s3path = S3Path("my-bucket/lambda/source/0.1.0/abc123/source.zip")
         result = BuildAndUploadSourceResult(
-            source_sha256=uv_zip_sha256,
-            s3path_source_zip=S3Path("my-bucket/lambda/source/0.1.0/abc/source.zip"),
+            source_sha256="abc123",
+            s3path_source_zip=s3path,
         )
-        assert result.source_sha256 == uv_zip_sha256
+        assert result.source_sha256 == "abc123"
         assert result.s3path_source_zip.basename == "source.zip"
+        assert result.s3path_source_zip.key == "lambda/source/0.1.0/abc123/source.zip"
 
 
 if __name__ == "__main__":

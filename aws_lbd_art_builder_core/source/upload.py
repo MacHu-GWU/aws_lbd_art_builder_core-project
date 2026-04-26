@@ -67,7 +67,7 @@ def upload_source_zip(
 
     :return: S3Path object pointing to the uploaded source.zip file
     """
-    if verbose:
+    if verbose:  # pragma: no cover
         printer(f"--- Uploading Lambda source zip to S3 ...")
         printer(f"{source_version = }")
         printer(f"{source_sha256 = }")
@@ -79,7 +79,7 @@ def upload_source_zip(
         source_version=source_version,
         source_sha256=source_sha256,
     )
-    if verbose:
+    if verbose:  # pragma: no cover
         printer(f"Uploading Lambda source zip to {s3path_source_zip.uri}")
         printer(f"preview at {s3path_source_zip.console_url}")
 

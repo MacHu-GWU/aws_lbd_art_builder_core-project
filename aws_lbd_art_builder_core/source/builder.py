@@ -71,7 +71,7 @@ def build_source_dir_using_pip(
     :param verbose: When ``True``, print the pip command and its output.
     :param printer: Callable used for log output (default: :func:`print`).
     """
-    if verbose:
+    if verbose:  # pragma: no cover
         printer("--- Building Lambda source dir using pip ...")
         printer(f"{path_bin_pip = !s}")
         printer(f"{path_pyproject_toml = !s}")
@@ -90,7 +90,7 @@ def build_source_dir_using_pip(
         "--no-dependencies",
         f"--target={dir_lambda_source_build}",
     ]
-    if verbose is False:
+    if verbose is False:  # pragma: no cover
         args.append("--disable-pip-version-check")
         args.append("--quiet")
     subprocess.run(args, check=True)
@@ -132,7 +132,7 @@ def build_source_dir_using_uv(
     :param verbose: When ``True``, print the uv command and its output.
     :param printer: Callable used for log output (default: :func:`print`).
     """
-    if verbose:
+    if verbose: # pragma: no cover
         printer("--- Building Lambda source dir using uv ...")
         printer(f"{path_bin_uv = !s}")
         printer(f"{path_pyproject_toml = !s}")
@@ -151,7 +151,7 @@ def build_source_dir_using_uv(
         "--no-deps",
         f"--target={dir_lambda_source_build}",
     ]
-    if verbose is False:
+    if verbose is False:  # pragma: no cover
         args.append("--quiet")
     subprocess.run(args, check=True)
 
@@ -189,7 +189,7 @@ def create_source_zip(
     :param printer: Callable used for log output (default: :func:`print`).
     :return: SHA256 hex digest of the source build directory.
     """
-    if verbose:
+    if verbose:  # pragma: no cover
         printer("--- Creating Lambda source zip file ...")
         printer(f"{dir_lambda_source_build = !s}")
         printer(f"{path_source_zip = !s}")
@@ -200,7 +200,7 @@ def create_source_zip(
         "-r",
         "-9",
     ]
-    if verbose is False:
+    if verbose is False:  # pragma: no cover
         args.append("-q")
 
     # temp_cwd is required: glob("*") is CWD-relative and zip entries must be
@@ -210,6 +210,6 @@ def create_source_zip(
         subprocess.run(args, check=True)
 
     source_sha256 = hashes.of_paths([dir_lambda_source_build])
-    if verbose:
+    if verbose:  # pragma: no cover
         printer(f"{source_sha256 = }")
     return source_sha256
