@@ -16,15 +16,23 @@ Build output is kept on disk after the run for manual inspection:
 import shutil
 from pathlib import Path
 
-import pytest
+try:
+    import tomllib
+except ImportError:  # pragma: no cover
+    import tomli as tomllib
 
 from s3pathlib import S3Path
 
 from aws_lbd_art_builder_core.tests.mock_aws import BaseMockAwsTest
 from aws_lbd_art_builder_core.constants import S3MetadataKeyEnum
-from aws_lbd_art_builder_core.source.foundation import SourcePathLayout, SourceS3Layout
-from aws_lbd_art_builder_core.source.builder import build_source_dir_using_uv, create_source_zip
-from aws_lbd_art_builder_core.source.upload import upload_source_zip, BuildAndUploadSourceResult
+from aws_lbd_art_builder_core.source.foundation import SourcePathLayout
+from aws_lbd_art_builder_core.source.foundation import SourceS3Layout
+from aws_lbd_art_builder_core.source.builder import build_source_dir_using_uv
+from aws_lbd_art_builder_core.source.builder import create_source_zip
+from aws_lbd_art_builder_core.source.upload import upload_source_zip
+from aws_lbd_art_builder_core.source.upload import BuildAndUploadSourceResult
+from aws_lbd_art_builder_core.source.upload import build_and_upload_source_using_pip
+from aws_lbd_art_builder_core.source.upload import build_and_upload_source_using_uv
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -203,6 +211,117 @@ class TestUploadSourceZip(BaseMockAwsTest):
             source_sha256=self.source_sha256,
         )
         assert s3path.uri == expected.uri
+
+
+# ---------------------------------------------------------------------------
+# Tests: build_and_upload_source_using_pip
+# ---------------------------------------------------------------------------
+
+class TestBuildAndUploadSourceUsingPip(BaseMockAwsTest):
+    use_mock = True
+
+    BUCKET = "test-lambda-bucket-pip"
+
+    s3dir_source: S3Path = None
+    result: BuildAndUploadSourceResult = None
+
+    @classmethod
+    def setup_class_post_hook(cls):
+        cls.create_s3_bucket(cls.BUCKET)
+        cls.s3dir_source = S3Path(f"{cls.BUCKET}/lambda/my-func/source/")
+        cls.result = build_and_upload_source_using_pip(
+            s3_client=cls.s3_client,
+            dir_project_root=DIR_PROJECT_ROOT,
+            s3dir_source=cls.s3dir_source,
+            skip_prompt=True,
+            verbose=False,
+        )
+
+    def test_returns_build_and_upload_source_result(self):
+        assert isinstance(self.result, BuildAndUploadSourceResult)
+
+    def test_source_sha256_is_64_char_hex(self):
+        assert isinstance(self.result.source_sha256, str)
+        assert len(self.result.source_sha256) == 64
+
+    def test_s3path_filename_is_source_zip(self):
+        assert self.result.s3path_source_zip.basename == "source.zip"
+
+    def test_object_exists_in_s3(self):
+        assert self.result.s3path_source_zip.exists(bsm=self.s3_client)
+
+    def test_s3path_contains_version_from_pyproject_toml(self):
+        expected_version = tomllib.loads(PATH_PYPROJECT_TOML.read_text())["project"]["version"]
+        assert expected_version in self.result.s3path_source_zip.key
+
+    def test_s3path_contains_sha256(self):
+        assert self.result.source_sha256 in self.result.s3path_source_zip.key
+
+    def test_s3path_matches_layout(self):
+        layout = SourceS3Layout(dir_root=self.s3dir_source)
+        expected_version = tomllib.loads(PATH_PYPROJECT_TOML.read_text())["project"]["version"]
+        expected = layout.get_s3path_source_zip(
+            source_version=expected_version,
+            source_sha256=self.result.source_sha256,
+        )
+        assert self.result.s3path_source_zip.uri == expected.uri
+
+
+# ---------------------------------------------------------------------------
+# Tests: build_and_upload_source_using_uv
+# ---------------------------------------------------------------------------
+
+class TestBuildAndUploadSourceUsingUv(BaseMockAwsTest):
+    use_mock = True
+
+    BUCKET = "test-lambda-bucket-uv"
+
+    s3dir_source: S3Path = None
+    result: BuildAndUploadSourceResult = None
+
+    @classmethod
+    def setup_class_post_hook(cls):
+        path_bin_uv = shutil.which("uv")
+        assert path_bin_uv is not None, "uv not found on PATH"
+        cls.create_s3_bucket(cls.BUCKET)
+        cls.s3dir_source = S3Path(f"{cls.BUCKET}/lambda/my-func/source/")
+        cls.result = build_and_upload_source_using_uv(
+            s3_client=cls.s3_client,
+            path_bin_uv=Path(path_bin_uv),
+            dir_project_root=DIR_PROJECT_ROOT,
+            s3dir_source=cls.s3dir_source,
+            skip_prompt=True,
+            verbose=False,
+        )
+
+    def test_returns_build_and_upload_source_result(self):
+        assert isinstance(self.result, BuildAndUploadSourceResult)
+
+    def test_source_sha256_is_64_char_hex(self):
+        assert isinstance(self.result.source_sha256, str)
+        assert len(self.result.source_sha256) == 64
+
+    def test_s3path_filename_is_source_zip(self):
+        assert self.result.s3path_source_zip.basename == "source.zip"
+
+    def test_object_exists_in_s3(self):
+        assert self.result.s3path_source_zip.exists(bsm=self.s3_client)
+
+    def test_s3path_contains_version_from_pyproject_toml(self):
+        expected_version = tomllib.loads(PATH_PYPROJECT_TOML.read_text())["project"]["version"]
+        assert expected_version in self.result.s3path_source_zip.key
+
+    def test_s3path_contains_sha256(self):
+        assert self.result.source_sha256 in self.result.s3path_source_zip.key
+
+    def test_s3path_matches_layout(self):
+        layout = SourceS3Layout(dir_root=self.s3dir_source)
+        expected_version = tomllib.loads(PATH_PYPROJECT_TOML.read_text())["project"]["version"]
+        expected = layout.get_s3path_source_zip(
+            source_version=expected_version,
+            source_sha256=self.result.source_sha256,
+        )
+        assert self.result.s3path_source_zip.uri == expected.uri
 
 
 # ---------------------------------------------------------------------------

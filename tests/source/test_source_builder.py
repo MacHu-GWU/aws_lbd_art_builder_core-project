@@ -22,11 +22,9 @@ from pathlib import Path
 import pytest
 
 from aws_lbd_art_builder_core.source.foundation import SourcePathLayout
-from aws_lbd_art_builder_core.source.builder import (
-    build_source_dir_using_pip,
-    build_source_dir_using_uv,
-    create_source_zip,
-)
+from aws_lbd_art_builder_core.source.builder import build_source_dir_using_pip
+from aws_lbd_art_builder_core.source.builder import build_source_dir_using_uv
+from aws_lbd_art_builder_core.source.builder import create_source_zip
 
 # ---------------------------------------------------------------------------
 # Paths

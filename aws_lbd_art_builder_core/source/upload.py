@@ -32,8 +32,11 @@ from ..imports import S3Path
 from ..constants import S3MetadataKeyEnum
 from ..typehint import T_PRINTER
 
-from .foundation import SourcePathLayout, SourceS3Layout
-from .builder import build_source_dir_using_pip, build_source_dir_using_uv, create_source_zip
+from .foundation import SourcePathLayout
+from .foundation import SourceS3Layout
+from .builder import build_source_dir_using_pip
+from .builder import build_source_dir_using_uv
+from .builder import create_source_zip
 
 if T.TYPE_CHECKING:  # pragma: no cover
     from mypy_boto3_s3.client import S3Client

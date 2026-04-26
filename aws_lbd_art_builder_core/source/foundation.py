@@ -28,7 +28,8 @@ automatically from the shared ``s3dir_lambda`` parent.
 import dataclasses
 from pathlib import Path
 
-from func_args.api import BaseFrozenModel, REQ
+from func_args.api import BaseFrozenModel
+from func_args.api import REQ
 from ..imports import S3Path
 
 

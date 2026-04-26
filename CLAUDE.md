@@ -58,6 +58,7 @@ This project uses **pytest** with a special pattern that allows running individu
 2. Use task commands (`mise run`) instead of direct tool invocation
 3. Follow the testing pattern when creating new test files
 4. Reference configuration files for specific settings rather than assuming defaults
+5. **Import style:** one symbol per import line — `from x import a` then `from x import b`, never `from x import a, b`
 
 **Tools in use:**
 - **mise-en-place** - Development tool management
