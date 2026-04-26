@@ -1,20 +1,20 @@
 # -*- coding: utf-8 -*-
 
 """
-Common infrastructure for Lambda layer builders using the Command Pattern.
+Common infrastructure for Lambda layer builders.
 
 This module provides the foundational classes and utilities that support multiple
-build strategies (pip, poetry, uv) through a consistent command pattern architecture.
-The design separates public API functions from internal command classes to balance
-ease of use with code maintainability.
+build strategies (pip, poetry, uv) through a consistent architecture.
+The design separates tool-agnostic infrastructure (this module) from
+tool-specific logic (downstream packages like aws_lbd_art_builder_uv).
 
-Architecture Overview:
+Key classes:
 
-- **Public Functions**: Simple API for end users
-    (e.g., build_layer_artifacts_using_pip_in_local, build_layer_artifacts_using_pip_in_container)
-- **Command Classes**: Internal implementation for better code organization and testability
-- **Local Builders**: Direct dependency installation on the host machine
-- **Container Builders**: Dockerized builds for AWS Lambda runtime compatibility
+- :class:`Credentials` - Private repository authentication
+- :class:`LayerPathLayout` - Local directory layout manager
+- :class:`LayerS3Layout` - S3 directory layout manager
+- :class:`BaseLogger` - Logging mixin
+- :class:`LayerManifestManager` - Dependency manifest management
 """
 
 import typing as T
@@ -30,7 +30,7 @@ from functools import cached_property
 from func_args.api import BaseFrozenModel, REQ
 
 from ..typehint import T_PRINTER
-from ..constants import ZFILL, LayerBuildToolEnum
+from ..constants import ZFILL
 from ..imports import S3Path
 from ..utils import write_bytes, clean_build_directory
 
@@ -128,10 +128,6 @@ class Credentials:
         """
         Configure Poetry authentication via environment variables.
 
-        Poetry uses POETRY_HTTP_BASIC_{SOURCE}_USERNAME/PASSWORD environment
-        variables for private repository authentication, following Poetry's
-        documented credential configuration pattern.
-
         .. seealso::
 
             https://python-poetry.org/docs/repositories/#configuring-credentials
@@ -162,8 +158,11 @@ class LayerPathLayout(BaseFrozenModel):
     """
     Local directory layout manager for Lambda layer build artifacts.
 
+    This class manages tool-agnostic directory conventions. Tool-specific
+    paths (e.g., poetry.lock, uv.lock) are handled by downstream packages.
+
     Assuming your Git repository is located at ``${dir_project_root}/``,
-    we use ``${dir_project_root}`` to represent this path. The Lambda layer-related paths are as follows:
+    the Lambda layer-related paths are as follows:
 
     - ``${dir_project_root}``
         :meth:`dir_project_root`, Git repository root directory.
@@ -177,7 +176,6 @@ class LayerPathLayout(BaseFrozenModel):
     - ``${dir_project_root}/build/lambda/layer/repo``
         :meth:`dir_repo`, to avoid affecting original files in the repository, we create a temporary
         directory here with a structure similar to dir_project_root, copying important files like pyproject.toml.
-        If temporary virtual environments need to be built, they will also be created here.
     - ``${dir_project_root}/build/lambda/layer/artifacts``
         :meth:`dir_artifacts`, directory for storing all files to be packaged into layer.zip
     - ``${dir_project_root}/build/lambda/layer/artifacts/python``
@@ -282,9 +280,6 @@ class LayerPathLayout(BaseFrozenModel):
         """
         Local path where the containerized build script is copied.
 
-        This script contains the build logic that will be executed inside
-        the Docker container to install dependencies.
-
         .. important::
 
             This path has to be outside the :meth:`dir_build_lambda_layer` folder,
@@ -303,55 +298,6 @@ class LayerPathLayout(BaseFrozenModel):
         """
         p = self.path_build_lambda_layer_in_container_script_in_local
         return self.get_path_in_container(p)
-
-    @property
-    def path_requirements_txt(self) -> Path:
-        """
-        The generated requirements.txt file path.
-        """
-        return self.dir_project_root / "requirements.txt"
-
-    @property
-    def path_poetry_toml(self) -> Path:
-        """
-        The original poetry.toml file path (local poetry config).
-        """
-        return self.dir_project_root / "poetry.toml"
-
-    @property
-    def path_tmp_poetry_toml(self) -> Path:
-        """
-        A temporary copy of poetry.toml for building the layer.
-        """
-        return self.dir_repo / "poetry.toml"
-
-    @property
-    def path_poetry_lock(self) -> Path:
-        """
-        The original poetry.lock file path.
-        """
-        return self.dir_project_root / "poetry.lock"
-
-    @property
-    def path_tmp_poetry_lock(self) -> Path:
-        """
-        A temporary copy of poetry.lock for building the layer.
-        """
-        return self.dir_repo / "poetry.lock"
-
-    @property
-    def path_uv_lock(self) -> Path:
-        """
-        The original uv.lock file path.
-        """
-        return self.dir_project_root / "uv.lock"
-
-    @property
-    def path_tmp_uv_lock(self) -> Path:
-        """
-        A temporary copy of uv.lock for building the layer.
-        """
-        return self.dir_repo / "uv.lock"
 
     @property
     def path_private_repository_credentials_in_local(self) -> Path:
@@ -397,9 +343,6 @@ class LayerPathLayout(BaseFrozenModel):
         """
         Clean existing build directory to ensure fresh installation.
 
-        Removes all artifacts from previous builds to prevent conflicts
-        and ensure reproducible layer creation.
-
         :param skip_prompt: If True, skip user confirmation for directory removal
         """
         clean_build_directory(
@@ -411,9 +354,6 @@ class LayerPathLayout(BaseFrozenModel):
     def mkdirs(self):
         """
         Create all necessary directories for the build process.
-
-        Ensures the directory structure is ready for dependency installation
-        and layer artifact creation.
         """
         self.dir_repo.mkdir(parents=True, exist_ok=True)
         self.dir_python.mkdir(parents=True, exist_ok=True)
@@ -442,9 +382,6 @@ class LayerPathLayout(BaseFrozenModel):
         """
         Copy containerized build script to the project directory.
 
-        The build script contains tool-specific logic (pip/poetry/uv) that will
-        be executed inside the Docker container.
-
         :param p_src: Path to the tool-specific build script
         :param printer: Function to handle log messages
         """
@@ -458,9 +395,6 @@ class LayerPathLayout(BaseFrozenModel):
         """
         Copy pyproject.toml to the isolated build directory.
 
-        Creates a clean copy for dependency resolution without affecting
-        the original project configuration.
-
         :param printer: Function to handle log messages
         """
         self.copy_file(
@@ -468,85 +402,6 @@ class LayerPathLayout(BaseFrozenModel):
             p_dst=self.path_tmp_pyproject_toml,
             printer=printer,
         )
-
-    def copy_poetry_toml(self, printer: T_PRINTER = print):
-        """
-        Copy poetry.toml to the isolated build directory if it exists.
-
-        poetry.toml is the local poetry config (e.g. virtualenvs.in-project = true).
-        Poetry reads it from the directory where pyproject.toml lives, so it must
-        be copied to dir_repo alongside pyproject.toml for the setting to take effect.
-
-        :param printer: Function to handle log messages
-        """
-        if self.path_poetry_toml.exists():
-            self.copy_file(
-                p_src=self.path_poetry_toml,
-                p_dst=self.path_tmp_poetry_toml,
-                printer=printer,
-            )
-
-    def copy_poetry_lock(self, printer: T_PRINTER = print):
-        """
-        Copy poetry.lock to the isolated build directory.
-
-        Ensures dependency versions remain consistent by using the locked
-        dependency resolution from the original project.
-
-        :param printer: Function to handle log messages
-        """
-        self.copy_file(
-            p_src=self.path_poetry_lock,
-            p_dst=self.path_tmp_poetry_lock,
-            printer=printer,
-        )
-
-    def copy_uv_lock(self, printer: T_PRINTER = print):
-        """
-        Copy uv.lock to the isolated build directory.
-
-        Maintains reproducible builds by preserving the exact dependency
-        versions resolved by uv.
-
-        :param printer: Function to handle log messages
-        """
-        self.copy_file(
-            p_src=self.path_uv_lock,
-            p_dst=self.path_tmp_uv_lock,
-            printer=printer,
-        )
-
-    def get_path_manifest(
-        self,
-        tool: LayerBuildToolEnum,
-    ) -> Path:
-        """
-        Get the dependency manifest file path for the specified build tool.
-
-        A dependency manifest is the "source of truth" file that contains the exact
-        specification of all dependencies and their versions. With this manifest file,
-        the Python layer can be rebuilt identically, ensuring reproducible builds
-        across different environments.
-
-        **Manifest Types by Tool:**
-
-        - **pip**: ``requirements.txt`` - Lists exact package versions and hashes
-        - **poetry**: ``poetry.lock`` - Lock file with resolved dependency tree
-        - **uv**: ``uv.lock`` - Lock file with ultra-fast resolved dependencies
-
-        :param tool: The build tool enum specifying which manifest to return
-        :return: Path to the appropriate dependency manifest file
-        :raises ValueError: If an unsupported build tool is specified
-        """
-
-        if tool == LayerBuildToolEnum.pip:
-            return self.path_requirements_txt
-        elif tool == LayerBuildToolEnum.poetry:
-            return self.path_poetry_lock
-        elif tool == LayerBuildToolEnum.uv:
-            return self.path_uv_lock
-        else:
-            raise ValueError(f"Unsupported tool: {tool}")
 
 
 @dataclasses.dataclass
@@ -556,18 +411,14 @@ class LayerS3Layout:
 
     This class provides a structured approach to organizing Lambda layer artifacts
     in S3 with proper versioning support. It manages both temporary upload locations
-    and permanent versioned storage for requirements tracking and layer management.
+    and permanent versioned storage for manifest tracking and layer management.
 
     Assuming ``s3dir_lambda`` is ``s3://bucket/path/lambda``, the relevant paths are:
 
     - ``${s3dir_lambda}/layer/layer.zip``
         :meth:`s3path_temp_layer_zip`, Temporary upload location for layer zip file.
-    - ``${s3dir_lambda}/layer/000001/requirements.txt``
-        :meth:`get_s3path_layer_requirements_txt`, Versioned requirements file for layer version 1.
-    - ``${s3dir_lambda}/layer/000002/requirements.txt``
-        :meth:`get_s3path_layer_requirements_txt`, Versioned requirements file for layer version 2.
-    - ``${s3dir_lambda}/layer/last-requirements.txt``
-        :meth:`s3path_last_requirements_txt`, Requirements file from the most recently published layer version.
+    - ``${s3dir_lambda}/layer/000001/{manifest_filename}``
+        :meth:`get_s3path_layer_manifest`, Versioned manifest file for layer version 1.
     """
 
     s3dir_lambda: "S3Path" = dataclasses.field()
@@ -576,10 +427,6 @@ class LayerS3Layout:
     def s3path_temp_layer_zip(self) -> "S3Path":
         """
         Temporary S3 location for layer zip uploads before AWS Lambda layer publishing.
-
-        This is a staging location used during the layer publishing process. AWS Lambda
-        reads the zip from this location and stores it internally, so we don't need to
-        maintain historical versions in S3.
 
         .. note::
 
@@ -595,13 +442,10 @@ class LayerS3Layout:
         layer_version: int,
     ) -> "S3Path":
         """
-        Generate S3 dir for a specific layer version' artifacts.
-
-        Each layer version gets its own directory with zero-padded numbering
-        to maintain proper lexicographic ordering in S3.
+        Generate S3 dir for a specific layer version's artifacts.
 
         :param layer_version: Layer version number (e.g., 1, 2, 3...)
-        :return: S3Path object pointing to the versioned requirements.txt file
+        :return: S3Path object pointing to the versioned directory
                  (e.g., s3://bucket/path/lambda/layer/000001/)
         """
         return self.s3dir_lambda.joinpath(
@@ -609,62 +453,22 @@ class LayerS3Layout:
             str(layer_version).zfill(ZFILL),
         ).to_dir()
 
-    def get_s3path_layer_requirements_txt(
+    def get_s3path_layer_manifest(
         self,
         layer_version: int,
+        manifest_filename: str,
     ) -> "S3Path":
         """
-        Generate S3 path for a specific layer version's requirements.txt file.
+        Generate S3 path for a specific layer version's manifest file.
+
+        This is a generic method that works with any manifest type
+        (requirements.txt, poetry.lock, uv.lock, etc.).
 
         :param layer_version: Layer version number (e.g., 1, 2, 3...)
-        :return: S3Path object pointing to the versioned requirements.txt file
+        :param manifest_filename: The manifest filename (e.g., "requirements.txt", "uv.lock")
+        :return: S3Path object pointing to the versioned manifest file
         """
-        return self.get_s3dir_layer_version(layer_version) / "requirements.txt"
-
-    def get_s3path_layer_poetry_lock(
-        self,
-        layer_version: int,
-    ) -> "S3Path":
-        """
-        Generate S3 path for a specific layer version's poetry.lock file.
-
-        :param layer_version: Layer version number (e.g., 1, 2, 3...)
-        :return: S3Path object pointing to the versioned poetry.lock file
-        """
-        return self.get_s3dir_layer_version(layer_version) / "poetry.lock"
-
-    def get_s3path_layer_uv_lock(
-        self,
-        layer_version: int,
-    ) -> "S3Path":
-        """
-        Generate S3 path for a specific layer version's uv.lock file.
-
-        :param layer_version: Layer version number (e.g., 1, 2, 3...)
-        :return: S3Path object pointing to the versioned uv.lock file
-        """
-        return self.get_s3dir_layer_version(layer_version) / "uv.lock"
-
-    @property
-    def s3path_last_requirements_txt(self) -> "S3Path":
-        """
-        S3 path to the most recently published layer's requirements.txt file.
-        """
-        return self.s3dir_lambda.joinpath("layer", "last-requirements.txt")
-
-    @property
-    def s3path_last_poetry_lock(self) -> "S3Path":
-        """
-        S3 path to the most recently published layer's poetry.lock file.
-        """
-        return self.s3dir_lambda.joinpath("layer", "last-poetry.lock")
-
-    @property
-    def s3path_last_uv_lock(self) -> "S3Path":
-        """
-        S3 path to the most recently published layer's uv.lock file.
-        """
-        return self.s3dir_lambda.joinpath("layer", "last-uv.lock")
+        return self.get_s3dir_layer_version(layer_version) / manifest_filename
 
 
 @dataclasses.dataclass(frozen=True)
@@ -684,11 +488,15 @@ class BaseLogger(BaseFrozenModel):
 class LayerManifestManager(BaseLogger):
     """
     Manages dependency manifest files for Lambda layers.
+
+    This is a tool-agnostic manager that accepts a direct path to the manifest
+    file. Downstream packages pass in their tool-specific manifest path
+    (e.g., requirements.txt for pip, uv.lock for uv, poetry.lock for poetry).
     """
 
     path_pyproject_toml: Path = dataclasses.field(default=REQ)
     s3dir_lambda: "S3Path" = dataclasses.field(default=REQ)
-    layer_build_tool: LayerBuildToolEnum = dataclasses.field(default=REQ)
+    path_manifest: Path = dataclasses.field(default=REQ)
     s3_client: "S3Client" = dataclasses.field(default=REQ)
 
     @cached_property
@@ -710,13 +518,6 @@ class LayerManifestManager(BaseLogger):
         )
 
     @cached_property
-    def path_manifest(self) -> Path:
-        """
-        Get the dependency manifest file path.
-        """
-        return self.path_layout.get_path_manifest(tool=self.layer_build_tool)
-
-    @cached_property
     def manifest_md5(self) -> str:
         """
         Calculate the MD5 hash of the dependency manifest file.
@@ -730,6 +531,7 @@ class LayerManifestManager(BaseLogger):
         :param version: The layer version number to get the manifest path for
         :return: S3Path pointing to the stored manifest file for the specified version
         """
-        s3dir = self.s3_layout.get_s3dir_layer_version(layer_version=version)
-        s3path = s3dir.joinpath(self.path_manifest.name)
-        return s3path
+        return self.s3_layout.get_s3path_layer_manifest(
+            layer_version=version,
+            manifest_filename=self.path_manifest.name,
+        )
