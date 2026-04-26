@@ -1,7 +1,26 @@
 # -*- coding: utf-8 -*-
 
 """
-Lambda layer building implementation - Step 1 of the layer creation workflow.
+Base command classes for Lambda layer building — Step 1 of the layer workflow.
+
+**Why Command Pattern?**
+
+Layer builds have many configuration knobs (paths, credentials, Python version,
+architecture, Docker options, …). A plain function would accumulate these as
+positional/keyword arguments; every subclass or wrapper that adds a knob must
+change the function signature, which ripples through all callers.
+
+With the Command Pattern each knob is a dataclass field on the instance.
+Subclasses add fields freely without touching ``run()``'s signature (always
+zero-arg). Callers construct → optionally override steps → call ``run()``.
+
+This module provides two abstract bases:
+
+- :class:`BaseLambdaLayerLocalBuilder` — builds directly on the host
+- :class:`BaseLambdaLayerContainerBuilder` — builds inside a Docker container
+
+Both follow a standardized 4-step workflow. Downstream packages (e.g.
+``aws_lbd_art_builder_uv``) subclass and implement the tool-specific steps.
 """
 
 import dataclasses
@@ -11,36 +30,35 @@ from functools import cached_property
 
 from func_args.api import REQ
 
-from ..constants import LayerBuildToolEnum
-
-from .foundation import Credentials, LayerPathLayout, BaseLogger
+from .foundation import Credentials
+from .foundation import LayerPathLayout
+from .foundation import BaseLogger
 
 
 @dataclasses.dataclass(frozen=True)
-class BasedLambdaLayerLocalBuilder(BaseLogger):
+class BaseLambdaLayerLocalBuilder(BaseLogger):
     """
     Base command class for local Lambda layer builds.
 
-    This abstract base implements a standardized 4-step workflow for building Lambda layers
-    directly on the host machine using local dependency management tools (pip, Poetry, UV).
-    The command pattern design allows fine-grained control and customization of each build phase.
-
     **4-Step Build Workflow:**
 
-    1. **Preflight Check** (:meth:`step_1_preflight_check`): Validate environment, tools, and project structure
-    2. **Prepare Environment** (:meth:`step_2_prepare_environment`): Clean build directories and set up workspace
-    3. **Execute Build** (:meth:`step_3_execute_build`): Run tool-specific dependency installation (abstract)
-    4. **Finalize Artifacts** (:meth:`step_4_finalize_artifacts`): Transform output into Lambda-compatible structure
+    1. **Preflight Check** (:meth:`step_1_preflight_check`):
+       Validate environment, tools, and project structure
+    2. **Prepare Environment** (:meth:`step_2_prepare_environment`):
+       Clean build directories and set up workspace
+    3. **Execute Build** (:meth:`step_3_execute_build`):
+       Run tool-specific dependency installation (override in subclass)
+    4. **Finalize Artifacts** (:meth:`step_4_finalize_artifacts`):
+       Transform output into Lambda-compatible structure (override in subclass)
 
-    **Usage**: Subclass and implement :meth:`step_3_execute_build` with tool-specific logic.
-    Call :meth:`run` to execute the complete workflow, or invoke individual steps for custom workflows.
+    **Usage**: Subclass and implement :meth:`step_3_execute_build` with
+    tool-specific logic. Call :meth:`run` to execute the complete workflow,
+    or invoke individual steps for custom workflows.
     """
 
     path_pyproject_toml: Path = dataclasses.field(default=REQ)
     credentials: Credentials | None = dataclasses.field(default=None)
     skip_prompt: bool = dataclasses.field(default=False)
-
-    _build_tool: LayerBuildToolEnum = dataclasses.field(default=REQ)
 
     @cached_property
     def path_layout(self) -> LayerPathLayout:
@@ -69,7 +87,7 @@ class BasedLambdaLayerLocalBuilder(BaseLogger):
         """
         Perform read-only validation of build environment and project configuration.
         """
-        self.log("--- Step 1 - Flight Check")
+        self.log("--- Step 1 - Preflight Check")
         self.step_1_1_print_info()
 
     def step_2_prepare_environment(self):
@@ -81,13 +99,19 @@ class BasedLambdaLayerLocalBuilder(BaseLogger):
 
     def step_3_execute_build(self):
         """
-        Execute dependency manager-specific installation commands (pip/poetry/uv).
+        Execute dependency manager-specific installation commands.
+
+        Override this method in subclasses with tool-specific logic
+        (e.g. ``pip install``, ``uv pip install``, ``poetry install``).
         """
         self.log("--- Step 3 - Execute Build")
 
     def step_4_finalize_artifacts(self):
         """
         Transform build output into Lambda layer's required python/ directory structure.
+
+        Override this method in subclasses if post-build transformations are needed
+        (e.g. moving site-packages into the ``python/`` directory).
         """
         self.log("--- Step 4 - Finalize Artifacts")
 
@@ -95,12 +119,8 @@ class BasedLambdaLayerLocalBuilder(BaseLogger):
     def step_1_1_print_info(self):
         """
         Display build configuration and paths.
-
-        Provides visibility into the build process by showing which tool
-        is being used and where artifacts will be created.
         """
-        self.log(f"--- Step 1.1 - Print Build Info")
-        self.log(f"build tool = {self._build_tool.value}")
+        self.log("--- Step 1.1 - Print Build Info")
         p = self.path_pyproject_toml
         self.log(f"path_pyproject_toml = {p}")
         p = self.path_layout.dir_build_lambda_layer
@@ -113,38 +133,37 @@ class BasedLambdaLayerLocalBuilder(BaseLogger):
 
         Ensures a clean slate for layer creation by removing previous artifacts
         and establishing the required directory structure.
-
-        :param skip_prompt: If True, automatically remove existing build directory
         """
-        self.log(f"--- Step 2.1 - Setup Build Directory")
+        self.log("--- Step 2.1 - Setup Build Directory")
         dir = self.path_layout.dir_build_lambda_layer
         self.log(f"--- Clean existing build directory: {dir}")
         self.path_layout.clean(skip_prompt=self.skip_prompt)
         self.path_layout.mkdirs()
 
-    # --- step_3_execute_build sub-steps
-
-    # --- step_4_finalize_artifacts sub-steps
-
 
 @dataclasses.dataclass(frozen=True)
-class BasedLambdaLayerContainerBuilder(BaseLogger):
+class BaseLambdaLayerContainerBuilder(BaseLogger):
     """
     Base command class for containerized Lambda layer builds.
 
-    This abstract base implements a standardized 4-step workflow for building Lambda layers
-    inside Docker containers using official AWS SAM build images. The containerized approach
-    ensures perfect runtime compatibility while maintaining the same command pattern flexibility.
+    Uses official AWS SAM Docker images to ensure the built layer matches the
+    Lambda runtime environment exactly. This is important for packages with
+    C extensions that must be compiled for the target architecture.
 
     **4-Step Containerized Workflow:**
 
-    1. **Preflight Check** (:meth:`step_1_preflight_check`): Validate Docker environment and build prerequisites
-    2. **Prepare Environment** (:meth:`step_2_prepare_environment`): Copy build scripts and set up credentials
-    3. **Execute Build** (:meth:`step_3_execute_build`): Run Docker container with mounted volumes
-    4. **Finalize Artifacts** (:meth:`step_4_finalize_artifacts`): Clean up temporary files and validate results
+    1. **Preflight Check** (:meth:`step_1_preflight_check`):
+       Validate Docker environment and build prerequisites
+    2. **Prepare Environment** (:meth:`step_2_prepare_environment`):
+       Copy build scripts and set up credentials
+    3. **Execute Build** (:meth:`step_3_execute_build`):
+       Run Docker container with mounted volumes
+    4. **Finalize Artifacts** (:meth:`step_4_finalize_artifacts`):
+       Clean up temporary files and validate results
 
-    **Usage**: Subclass and provide tool-specific build script via :attr:`path_script`.
-    Call :meth:`run` to execute containerized build, or customize individual steps as needed.
+    **Usage**: Subclass and provide a tool-specific build script via
+    :attr:`path_script`. Call :meth:`run` to execute containerized build,
+    or customize individual steps as needed.
     """
 
     path_pyproject_toml: Path = dataclasses.field(default=REQ)
@@ -180,9 +199,6 @@ class BasedLambdaLayerContainerBuilder(BaseLogger):
     def image_uri(self) -> str:
         """
         Full Docker image URI for AWS SAM build container.
-
-        Uses official AWS SAM images that match the Lambda runtime environment
-        to ensure compatibility between local builds and deployed functions.
 
         :return: Complete Docker image URI from AWS public ECR
         """
@@ -278,7 +294,6 @@ class BasedLambdaLayerContainerBuilder(BaseLogger):
         """
         self.log("--- Step 4 - Finalize Artifacts")
 
-    # --- step_1_preflight_check sub-steps
     # --- step_2_prepare_environment sub-steps
     def step_2_1_copy_build_script(self):
         """
@@ -294,7 +309,7 @@ class BasedLambdaLayerContainerBuilder(BaseLogger):
         """
         Configure private repository authentication (optional).
         """
-        self.log(f"--- Step 2.2 - Setup Private Repository Credential")
+        self.log("--- Step 2.2 - Setup Private Repository Credential")
         if isinstance(self.credentials, Credentials) is False:
             self.log("No private repository credentials provided, skip.")
             return
@@ -307,9 +322,7 @@ class BasedLambdaLayerContainerBuilder(BaseLogger):
         """
         Execute the Docker container build process.
         """
-        self.log(f"--- Step 3.1 - Docker Run")
+        self.log("--- Step 3.1 - Docker Run")
         # If the python script raises an exception,
         # docker run command will also fail with a non-zero exit code
         subprocess.run(self.docker_run_args, check=True)
-
-    # --- step_4_finalize_artifacts sub-steps
