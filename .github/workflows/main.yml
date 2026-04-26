@@ -41,9 +41,10 @@ jobs:
       # The matrix strategy allows you to run multiple combinations of configurations
       # This will create a separate job for each combination of OS and Python version
       matrix:
+        # NOTE: THIS PACKAGE DOESN'T SUPPORT WINDOWS
         # Define the operating systems to test on
-        os: ["ubuntu-latest", "windows-latest"]
-#        os: ["ubuntu-latest", ] # Commented out configurations for quick debugging
+#        os: ["ubuntu-latest", "windows-latest"]
+        os: ["ubuntu-latest", ] # Commented out configurations for quick debugging
 #        os: ["windows-latest", ] # Commented out configurations for quick debugging
         # Define the Python versions to test with
         python-version: ["3.11", "3.12", "3.13", "3.14"]

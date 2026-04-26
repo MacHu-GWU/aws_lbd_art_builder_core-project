@@ -26,11 +26,11 @@ keywords = []
 readme = "README.rst"
 requires-python = ">=3.11,<4.0"
 # Full list of classifiers: https://pypi.org/classifiers/
+# NOTE: THIS PACKAGE DOESN'T SUPPORT WINDOWS
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Natural Language :: English",
-    "Operating System :: Microsoft :: Windows",
     "Operating System :: MacOS",
     "Operating System :: Unix",
     "Programming Language :: Python :: 3",
