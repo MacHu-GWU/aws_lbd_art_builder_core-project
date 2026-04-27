@@ -166,22 +166,13 @@ class LayerPathLayout(BaseFrozenModel):
     Assuming your Git repository is located at ``${dir_project_root}/``,
     the Lambda layer-related paths are as follows:
 
-    - ``${dir_project_root}``
-        :meth:`dir_project_root`, Git repository root directory.
-    - ``${dir_project_root}/pyproject.toml``
-        :attr:`path_pyproject_toml`, pyproject.toml file path.
-    - ``${dir_project_root}/build/lambda/layer``
-        :meth:`dir_build_lambda_layer`, temporary directory for building Lambda layer,
-        cleared before each build.
-    - ``${dir_project_root}/build/lambda/layer/layer.zip``
-        :meth:`path_build_lambda_layer_zip`, final Lambda layer zip file path for deployment.
-    - ``${dir_project_root}/build/lambda/layer/repo``
-        :meth:`dir_repo`, to avoid affecting original files in the repository, we create a temporary
-        directory here with a structure similar to dir_project_root, copying important files like pyproject.toml.
-    - ``${dir_project_root}/build/lambda/layer/artifacts``
-        :meth:`dir_artifacts`, directory for storing all files to be packaged into layer.zip
-    - ``${dir_project_root}/build/lambda/layer/artifacts/python``
-        :meth:`dir_python`, AWS Lambda required ``python`` subdirectory.
+    - ``${dir_project_root}``: :meth:`dir_project_root`, Git repository root directory.
+    - ``${dir_project_root}/pyproject.toml``: :attr:`path_pyproject_toml`, pyproject.toml file path.
+    - ``${dir_project_root}/build/lambda/layer``: :meth:`dir_build_lambda_layer`, temporary directory for building Lambda layer, cleared before each build.
+    - ``${dir_project_root}/build/lambda/layer/layer.zip``: :meth:`path_build_lambda_layer_zip`, final Lambda layer zip file path for deployment.
+    - ``${dir_project_root}/build/lambda/layer/repo``: :meth:`dir_repo`, to avoid affecting original files in the repository, we create a temporary directory here with a structure similar to dir_project_root, copying important files like pyproject.toml.
+    - ``${dir_project_root}/build/lambda/layer/artifacts``: :meth:`dir_artifacts`, directory for storing all files to be packaged into layer.zip
+    - ``${dir_project_root}/build/lambda/layer/artifacts/python``: :meth:`dir_python`, AWS Lambda required ``python`` subdirectory.
     """
 
     path_pyproject_toml: Path = dataclasses.field(default=REQ)
@@ -190,15 +181,23 @@ class LayerPathLayout(BaseFrozenModel):
     def dir_project_root(self) -> Path:
         """
         Project root directory, usually the Git repository root.
+
+        Example: ``${dir_project_root}``
         """
         return self.path_pyproject_toml.parent
 
     @cached_property
     def dir_venv(self) -> Path:
+        """
+        Example: ``${dir_project_root}/.venv``
+        """
         return self.dir_project_root / ".venv"
 
     @cached_property
     def path_venv_bin_python(self) -> Path:
+        """
+        Example: ``${dir_project_root}/.venv/bin/python``
+        """
         return self.dir_venv / "bin" / "python"
 
     @cached_property
@@ -217,6 +216,8 @@ class LayerPathLayout(BaseFrozenModel):
         """
         The site-packages directory of the virtual environment that stores
         all Lambda layer dependencies. Created by poetry or uv.
+
+        Example: ``${dir_project_root}/build/lambda/layer/repo/.venv/lib/python3.12/site-packages``
         """
         # TODO: support Windows
         major, minor, micro = self.venv_python_version
@@ -242,6 +243,8 @@ class LayerPathLayout(BaseFrozenModel):
     def dir_build_lambda(self) -> Path:
         """
         The build directory for Lambda-related artifacts.
+
+        Example: ``${dir_project_root}/build/lambda``
         """
         return self.dir_project_root / "build" / "lambda"
 
@@ -249,6 +252,8 @@ class LayerPathLayout(BaseFrozenModel):
     def dir_build_lambda_layer(self) -> Path:
         """
         The build directory for Lambda layer build.
+
+        Example: ``${dir_project_root}/build/lambda/layer``
 
         .. important::
 
@@ -260,6 +265,8 @@ class LayerPathLayout(BaseFrozenModel):
     def path_build_lambda_layer_zip(self) -> Path:
         """
         The output zip file path for the built Lambda layer.
+
+        Example: ``${dir_project_root}/build/lambda/layer/layer.zip``
         """
         return self.dir_build_lambda_layer / "layer.zip"
 
@@ -267,6 +274,8 @@ class LayerPathLayout(BaseFrozenModel):
     def dir_repo(self) -> Path:
         """
         A temporary copy of the project repository for building the layer.
+
+        Example: ``${dir_project_root}/build/lambda/layer/repo``
         """
         return self.dir_build_lambda_layer / "repo"
 
@@ -274,6 +283,8 @@ class LayerPathLayout(BaseFrozenModel):
     def path_tmp_pyproject_toml(self) -> Path:
         """
         A temporary copy of pyproject.toml for building the layer.
+
+        Example: ``${dir_project_root}/build/lambda/layer/repo/pyproject.toml``
         """
         return self.dir_repo / self.path_pyproject_toml.name
 
@@ -282,19 +293,16 @@ class LayerPathLayout(BaseFrozenModel):
         """
         Local path where the containerized build script is copied.
 
-        .. important::
-
-            This path has to be outside the :meth:`dir_build_lambda_layer` folder,
-            because the :meth:`dir_build_lambda_layer` folder is cleared before each
-            ``build_lambda_layer_***_in_local(...)`` function call, but this script
-            must persist before that.
+        Example: ``${dir_project_root}/build/lambda/layer/build_lambda_layer_in_container.py``
         """
-        return self.dir_project_root / "build_lambda_layer_in_container.py"
+        return self.dir_build_lambda_layer / "build_lambda_layer_in_container.py"
 
     @property
     def path_build_lambda_layer_in_container_script_in_container(self) -> str:
         """
         Container path where the build script can be executed.
+
+        Example: ``/var/task/build_lambda_layer_in_container.py``
 
         :return: Path string for use in Docker run commands
         """
@@ -306,12 +314,7 @@ class LayerPathLayout(BaseFrozenModel):
         """
         The private repository credentials file path.
 
-        .. important::
-
-            This path has to be outside the :meth:`dir_build_lambda_layer` folder,
-            because the :meth:`dir_build_lambda_layer` folder is cleared before each
-            ``build_lambda_layer_***_in_local(...)`` function call, but this script
-            must persist before that.
+        Example: ``${dir_project_root}/build/lambda/layer/private-repository-credentials.json``
         """
         return self.dir_build_lambda_layer / "private-repository-credentials.json"
 
@@ -319,6 +322,8 @@ class LayerPathLayout(BaseFrozenModel):
     def path_private_repository_credentials_in_container(self) -> str:
         """
         The private repository credentials file path inside the container.
+
+        Example: ``/var/task/private-repository-credentials.json``
         """
         p = self.path_private_repository_credentials_in_local
         return self.get_path_in_container(p)
@@ -327,6 +332,8 @@ class LayerPathLayout(BaseFrozenModel):
     def dir_artifacts(self) -> Path:
         """
         The directory to store all files to be included in the layer.zip.
+
+        Example: ``${dir_project_root}/build/lambda/layer/artifacts``
         """
         return self.dir_build_lambda_layer / "artifacts"
 
@@ -334,6 +341,8 @@ class LayerPathLayout(BaseFrozenModel):
     def dir_python(self) -> Path:
         """
         The AWS Lambda required ``python`` subdirectory.
+
+        Example: ``${dir_project_root}/build/lambda/layer/artifacts/python``
 
         Ref:
 
