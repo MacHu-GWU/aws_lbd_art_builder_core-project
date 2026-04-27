@@ -10,7 +10,6 @@ def test():
     _ = api.LayerS3Layout
     _ = api.BaseLogger
     _ = api.LayerManifestManager
-    _ = api.BaseLambdaLayerLocalBuilder
     _ = api.BaseLambdaLayerContainerBuilder
     _ = api.move_to_dir_python
     _ = api.default_ignore_package_list

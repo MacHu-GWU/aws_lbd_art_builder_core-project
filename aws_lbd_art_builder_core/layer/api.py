@@ -5,7 +5,6 @@ from .foundation import LayerPathLayout
 from .foundation import LayerS3Layout
 from .foundation import BaseLogger
 from .foundation import LayerManifestManager
-from .builder import BaseLambdaLayerLocalBuilder
 from .builder import BaseLambdaLayerContainerBuilder
 from .package import move_to_dir_python
 from .package import default_ignore_package_list

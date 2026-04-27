@@ -232,7 +232,7 @@ class LayerPathLayout(BaseFrozenModel):
         :param path_in_local: Local filesystem path relative to project root
         :return: Corresponding path inside Docker container
         """
-        relpath = path_in_local.relative_to(self.dir_project_root)
+        relpath = path_in_local.relative_to(self.dir_build_lambda_layer)
         parts = ["var", "task"]
         parts.extend(relpath.parts)
         path = "/" + "/".join(parts)
@@ -313,7 +313,7 @@ class LayerPathLayout(BaseFrozenModel):
             ``build_lambda_layer_***_in_local(...)`` function call, but this script
             must persist before that.
         """
-        return self.dir_build_lambda / "private-repository-credentials.json"
+        return self.dir_build_lambda_layer / "private-repository-credentials.json"
 
     @property
     def path_private_repository_credentials_in_container(self) -> str:
@@ -373,7 +373,7 @@ class LayerPathLayout(BaseFrozenModel):
         :param p_dst: Destination file path
         :param printer: Function to handle log messages
         """
-        printer(f"Copy {p_src} to {p_dst}")
+        printer(f"Copy '{p_src}' to '{p_dst}'")
         shutil.copy(p_src, p_dst)
 
     def copy_build_script(
@@ -484,6 +484,24 @@ class BaseLogger(BaseFrozenModel):
         """
         if self.verbose:
             self.printer(msg)
+
+    def log_header(self, title: str):
+        """Log a prominent section header with a box."""
+        n = len(title) + 4
+        self.log("")
+        self.log("+" + "-" * n + "+")
+        self.log("|  " + title + "  |")
+        self.log("+" + "-" * n + "+")
+
+    def log_sub_header(self, title: str):
+        """Log a sub-section header with a line."""
+        self.log("")
+        self.log("+----- " + title)
+        self.log("|")
+
+    def log_detail(self, msg: str):
+        """Log a detail line indented under a sub-section."""
+        self.log("|  " + msg)
 
 
 @dataclasses.dataclass(frozen=True)
