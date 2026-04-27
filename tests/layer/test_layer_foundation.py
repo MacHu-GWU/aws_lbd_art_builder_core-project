@@ -169,7 +169,7 @@ class TestLayerPathLayout:
 
     def test_path_build_lambda_layer_in_container_script_in_local(self):
         assert self.layout.path_build_lambda_layer_in_container_script_in_local == Path(
-            "/project/build_lambda_layer_in_container.py"
+            "/project/build/lambda/layer/build_lambda_layer_in_container.py"
         )
 
     def test_path_build_lambda_layer_in_container_script_in_container(self):
@@ -180,19 +180,19 @@ class TestLayerPathLayout:
 
     def test_path_private_repository_credentials_in_local(self):
         assert self.layout.path_private_repository_credentials_in_local == Path(
-            "/project/build/lambda/private-repository-credentials.json"
+            "/project/build/lambda/layer/private-repository-credentials.json"
         )
 
     def test_path_private_repository_credentials_in_container(self):
         assert (
             self.layout.path_private_repository_credentials_in_container
-            == "/var/task/build/lambda/private-repository-credentials.json"
+            == "/var/task/private-repository-credentials.json"
         )
 
     def test_get_path_in_container(self):
         local_path = Path("/project/build/lambda/layer/repo/pyproject.toml")
         container_path = self.layout.get_path_in_container(local_path)
-        assert container_path == "/var/task/build/lambda/layer/repo/pyproject.toml"
+        assert container_path == "/var/task/repo/pyproject.toml"
 
     def test_layer_zip_sits_at_dir_build_lambda_layer(self):
         """layer.zip must be a direct child of dir_build_lambda_layer."""
@@ -200,24 +200,6 @@ class TestLayerPathLayout:
             self.layout.path_build_lambda_layer_zip.parent
             == self.layout.dir_build_lambda_layer
         )
-
-    def test_container_script_outside_build_lambda_layer(self):
-        """
-        The container script must be outside dir_build_lambda_layer so it
-        persists when the layer build dir is cleaned.
-        """
-        script = self.layout.path_build_lambda_layer_in_container_script_in_local
-        layer_dir = self.layout.dir_build_lambda_layer
-        assert not str(script).startswith(str(layer_dir))
-
-    def test_credentials_file_outside_build_lambda_layer(self):
-        """
-        Credentials file must be outside dir_build_lambda_layer for the
-        same reason as the container script.
-        """
-        cred_path = self.layout.path_private_repository_credentials_in_local
-        layer_dir = self.layout.dir_build_lambda_layer
-        assert not str(cred_path).startswith(str(layer_dir) + "/")
 
     def test_frozen(self):
         with pytest.raises((AttributeError, TypeError)):
@@ -293,6 +275,7 @@ class TestLayerPathLayout:
         script_src = tmp_path / "my_script.py"
         script_src.write_text("print('hello')")
         layout = LayerPathLayout(path_pyproject_toml=pyproject)
+        layout.dir_build_lambda_layer.mkdir(parents=True, exist_ok=True)
         messages = []
         layout.copy_build_script(p_src=script_src, printer=messages.append)
         assert layout.path_build_lambda_layer_in_container_script_in_local.read_text() == "print('hello')"
