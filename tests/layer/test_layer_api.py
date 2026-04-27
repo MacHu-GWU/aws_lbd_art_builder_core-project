@@ -17,6 +17,7 @@ def test():
     _ = api.upload_layer_zip_to_s3
     _ = api.LambdaLayerVersionPublisher
     _ = api.LayerDeployment
+    _ = api.LayerDeploymentWorkflow
 
 
 if __name__ == "__main__":
