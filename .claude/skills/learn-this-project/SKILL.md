@@ -23,7 +23,7 @@ description: Load core knowledge of the aws_lbd_art_builder_core project — its
 
 Core provides two workflows:
 
-1. **Lambda layer workflow** (Steps 2–4): package → upload → publish. Sub-packages supply Step 1 (dependency installation).
+1. **Lambda layer workflow**: `LayerDeploymentWorkflow` orchestrates the full Build → Package → Upload → Publish pipeline in a single `run()` call. The builder is passed in via duck typing (`T_BUILDER` protocol — needs `.run()` and `.path_layout`), so sub-packages only implement the builder and pass it in.
 2. **Lambda source deployment workflow**: copy/filter source → pip install --no-deps → zip → upload to S3.
 
 It also provides pure-convention implementations: path layout managers, S3 layout managers, credentials handling, and abstract base classes for sub-package authors to extend.

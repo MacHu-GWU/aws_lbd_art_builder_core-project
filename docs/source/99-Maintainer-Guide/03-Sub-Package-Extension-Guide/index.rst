@@ -43,6 +43,10 @@ What Core Provides
      - Smart publish with change detection
    * - :class:`~aws_lbd_art_builder_core.layer.publish.LayerDeployment`
      - Immutable result of a successful publish
+   * - :class:`~aws_lbd_art_builder_core.layer.workflow.LayerDeploymentWorkflow`
+     - One-stop orchestrator: Build → Package → Upload → Publish in a single ``run()``
+   * - :class:`~aws_lbd_art_builder_core.layer.workflow.T_BUILDER`
+     - Protocol for builders (requires ``.run()`` and ``.path_layout``)
 
 All imports are available from ``aws_lbd_art_builder_core.layer.api``.
 
@@ -171,51 +175,46 @@ Full Example: UvLambdaLayerLocalBuilder
 End-to-End Workflow
 ------------------------------------------------------------------------------
 
-With the builder implemented, the full build → package → upload → publish
-workflow in a sub-package looks like this:
+With the builder implemented, use
+:class:`~aws_lbd_art_builder_core.layer.workflow.LayerDeploymentWorkflow`
+to run the full pipeline in one call:
 
 .. code-block:: python
 
     from pathlib import Path
-    from aws_lbd_art_builder_core.layer.api import create_layer_zip_file
-    from aws_lbd_art_builder_core.layer.api import upload_layer_zip_to_s3
-    from aws_lbd_art_builder_core.layer.api import LambdaLayerVersionPublisher
+    from s3pathlib import S3Path
+    from aws_lbd_art_builder_core.layer.api import LayerDeploymentWorkflow
 
-    path_pyproject_toml = Path("pyproject.toml")
-    path_manifest = Path("uv.lock")          # tool-specific manifest
-
-    # --- Step 1: Build ---
+    # Create a tool-specific builder (satisfies T_BUILDER protocol)
     builder = UvLambdaLayerLocalBuilder(
-        path_pyproject_toml=path_pyproject_toml,
+        path_pyproject_toml=Path("pyproject.toml"),
         skip_prompt=True,
     )
-    builder.run()
 
-    # --- Step 2: Package ---
-    create_layer_zip_file(
-        dir_python=builder.path_layout.dir_python,
-        path_layer_zip=builder.path_layout.path_build_lambda_layer_zip,
-    )
-
-    # --- Step 3: Upload ---
-    upload_layer_zip_to_s3(
+    # Run the full Build → Package → Upload → Publish pipeline
+    workflow = LayerDeploymentWorkflow(
+        builder=builder,
+        path_manifest=Path("uv.lock"),
+        s3dir_lambda=S3Path("s3://my-bucket/projects/my_app/lambda/"),
+        layer_name="my_app",
         s3_client=s3_client,
-        path_pyproject_toml=path_pyproject_toml,
-        s3dir_lambda=s3dir_lambda,
-        path_manifest=path_manifest,
-    )
-
-    # --- Step 4: Publish ---
-    publisher = LambdaLayerVersionPublisher(
-        path_pyproject_toml=path_pyproject_toml,
-        s3dir_lambda=s3dir_lambda,
-        path_manifest=path_manifest,
-        s3_client=s3_client,
-        layer_name="my-layer",
         lambda_client=lambda_client,
+        publish_layer_version_kwargs={
+            "CompatibleRuntimes": ["python3.12"],
+            "Description": "my_app dependencies layer",
+        },
     )
-    deployment = publisher.run()
+    deployment = workflow.run()
     # deployment.layer_version, deployment.layer_version_arn, ...
+
+You can also call individual steps if you need finer control:
+
+.. code-block:: python
+
+    workflow.step_1_build()
+    workflow.step_2_package()
+    workflow.step_3_upload()
+    deployment = workflow.step_4_publish()
 
 .. note::
 

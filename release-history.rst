@@ -15,6 +15,13 @@ x.y.z (Backlog)
 **Miscellaneous**
 
 
+0.1.4 (2027-04-27)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**Features and Improvements**
+
+- Added :class:`~aws_lbd_art_builder_core.layer.workflow.LayerDeploymentWorkflow` — a single class that orchestrates the complete Build → Package → Upload → Publish pipeline. Accepts a duck-typed builder via the :class:`~aws_lbd_art_builder_core.layer.workflow.T_BUILDER` protocol (any object with ``.run()`` and ``.path_layout``), so sub-packages no longer need to wire the 4 steps together manually.
+
+
 0.1.3 (2027-04-27)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 **Breaking Changes**

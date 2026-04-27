@@ -48,6 +48,7 @@ Module Map
     │   ├── package.py      # move_to_dir_python, create_layer_zip_file
     │   ├── upload.py       # upload_layer_zip_to_s3
     │   ├── publish.py      # LambdaLayerVersionPublisher, LayerDeployment
+    │   ├── workflow.py     # T_BUILDER protocol, LayerDeploymentWorkflow
     │   └── api.py          # Public API exports
     └── vendor/
         ├── better_pathlib.py  # temp_cwd context manager
@@ -67,6 +68,12 @@ Every tool-specific sub-package follows this sequence:
     Step 4 – Publish  (core)          Lambda publish_layer_version API
 
 Steps 2–4 are fully implemented in core. Sub-packages only implement Step 1.
+
+:class:`~aws_lbd_art_builder_core.layer.workflow.LayerDeploymentWorkflow` orchestrates
+all 4 steps in a single ``run()`` call. The builder is injected via the
+:class:`~aws_lbd_art_builder_core.layer.workflow.T_BUILDER` protocol (any object with
+``.run()`` and ``.path_layout``). Sub-packages pass their tool-specific builder in
+and get a complete pipeline without wiring the steps manually.
 
 
 Step 2 — Package
@@ -219,7 +226,7 @@ Step 2 copies the build script and dumps credentials JSON; Step 3 executes ``doc
 Public API by Audience (:mod:`aws_lbd_art_builder_core.api`)
 ------------------------------------------------------------------------------
 
-**For end users** — configure, deploy source, run layer workflow Steps 2/3/4:
+**For end users** — configure, deploy source, run layer workflow:
 
 .. code-block:: python
 
@@ -230,20 +237,20 @@ Public API by Audience (:mod:`aws_lbd_art_builder_core.api`)
         default_ignore_package_list,
         upload_layer_zip_to_s3,
         LambdaLayerVersionPublisher, LayerDeployment,
+        LayerDeploymentWorkflow,    # one-stop orchestrator
     )
 
-**For sub-package authors** — extend base classes, implement Step 1, assemble Workflow:
+**For sub-package authors** — extend base classes, implement Step 1, pass builder to workflow:
 
 .. code-block:: python
 
     from aws_lbd_art_builder_core.api import (
-        BaseLambdaLayerLocalBuilder, BaseLambdaLayerContainerBuilder,
+        BaseLambdaLayerContainerBuilder,
         LayerPathLayout, move_to_dir_python,
         temp_cwd,                               # for container build scripts
         # pass-through to users:
         Credentials,
-        upload_layer_zip_to_s3,
-        LambdaLayerVersionPublisher, LayerDeployment,
+        LayerDeploymentWorkflow, LayerDeployment,
     )
 
 
