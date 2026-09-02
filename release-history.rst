@@ -15,6 +15,13 @@ x.y.z (Backlog)
 **Miscellaneous**
 
 
+0.1.5 (2026-09-02)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**Features and Improvements**
+
+- Added :attr:`~aws_lbd_art_builder_core.layer.builder.BaseLambdaLayerContainerBuilder.script_args` — a hook for subclasses to pass extra command line arguments to the container-side build script (e.g. ``--extra xyz`` for ``uv sync``) without inventing a separate file format for it.
+
+
 0.1.4 (2027-04-27)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 **Features and Improvements**
