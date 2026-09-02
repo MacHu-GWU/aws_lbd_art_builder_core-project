@@ -114,6 +114,26 @@ class BaseLambdaLayerContainerBuilder(BaseLogger):
         )
 
     @property
+    def script_args(self) -> list[str]:
+        """
+        Arguments appended after the container-side build script path.
+
+        This is the hook a subclass uses to pass build options across the
+        host/container process boundary without inventing its own file format
+        (e.g. uv passes ``--extra xyz`` so the container-side ``uv sync``
+        installs the requested extras).  The base returns an empty list.
+
+        .. warning::
+
+            Never put secrets here.  ``docker run`` command lines are visible
+            in process listings; credentials belong in the JSON file at
+            :meth:`~aws_lbd_art_builder_core.layer.foundation.LayerPathLayout.path_private_repository_credentials_in_local`.
+
+        :return: Extra command line arguments for the container-side script.
+        """
+        return []
+
+    @property
     def docker_run_args(self) -> list[str]:
         """
         Complete Docker run command arguments.
@@ -134,4 +154,5 @@ class BaseLambdaLayerContainerBuilder(BaseLogger):
             "python",
             "-u",  # Unbuffered output for real-time logging
             self.path_layout.path_build_lambda_layer_in_container_script_in_container,
+            *self.script_args,
         ]

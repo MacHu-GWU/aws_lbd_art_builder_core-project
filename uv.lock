@@ -44,7 +44,7 @@ wheels = [
 
 [[package]]
 name = "aws-lbd-art-builder-core"
-version = "0.1.4"
+version = "0.1.5"
 source = { editable = "." }
 dependencies = [
     { name = "func-args" },
