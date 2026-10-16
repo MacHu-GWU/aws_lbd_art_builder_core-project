@@ -11,14 +11,12 @@ publisher's preflight checks and publish workflow.
 from aws_lbd_art_builder_core.layer.publish import LambdaLayerVersionPublisher
 from aws_lbd_art_builder_core.layer.publish import LayerDeployment
 
-import hashlib
 import zipfile
 from pathlib import Path
 
 import pytest
 from s3pathlib import S3Path
 
-from aws_lbd_art_builder_core.constants import S3MetadataKeyEnum
 from aws_lbd_art_builder_core.layer.foundation import LayerPathLayout
 from aws_lbd_art_builder_core.layer.foundation import LayerS3Layout
 from aws_lbd_art_builder_core.layer.upload import upload_layer_zip_to_s3

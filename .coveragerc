@@ -5,7 +5,6 @@ omit =
     aws_lbd_art_builder_core/docs/*
     aws_lbd_art_builder_core/tests/*
     aws_lbd_art_builder_core/vendor/*
-    aws_lbd_art_builder_core/_version.py
     aws_lbd_art_builder_core/cli.py
     aws_lbd_art_builder_core/paths.py
 

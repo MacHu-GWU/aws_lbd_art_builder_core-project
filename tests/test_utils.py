@@ -3,11 +3,9 @@
 import tempfile
 from pathlib import Path
 
-from aws_lbd_art_builder_core.utils import (
-    ensure_exact_one_true,
-    is_match,
-    copy_source_for_lambda_deployment,
-)
+from aws_lbd_art_builder_core.utils import ensure_exact_one_true
+from aws_lbd_art_builder_core.utils import is_match
+from aws_lbd_art_builder_core.utils import copy_source_for_lambda_deployment
 
 
 def test_ensure_exact_one_true():
