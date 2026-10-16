@@ -43,7 +43,7 @@ The container script runs inside the SAM image with only `dir_build_lambda_layer
 - **Use core's paths**, never hard-coded `build/lambda/layer/...` strings, so a layout change in core stays in one place.
 - **Pass the tool's lock file as `path_manifest`** (`uv.lock`, `poetry.lock`, `requirements.txt`). Change detection depends on it describing the full dependency set.
 - **Pin core to one major version** (`aws-lbd-art-builder-core>=X,<X+1`), and use core's `upload` / `publish` extras rather than listing `boto3` / `s3pathlib` versions separately, so the two never disagree.
-- **Test helpers:** a sub-package that needs mocked S3 or Lambda can reuse `aws_lbd_art_builder_core.tests.mock_aws.BaseMockAwsTest` (`05-test-strategy.md`). uv does not use it today: its unit tests make no AWS calls.
+- **Test helpers are not shared:** `aws_lbd_art_builder_core.tests` (including `BaseMockAwsTest`) is excluded from the wheel, so a sub-package cannot import it. A sub-package that needs mocked S3 or Lambda copies the class. uv does not need it today: its unit tests make no AWS calls.
 
 ## 5. What counts as a breaking change for sub-packages
 

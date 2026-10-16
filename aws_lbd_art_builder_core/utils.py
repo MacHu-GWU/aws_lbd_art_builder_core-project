@@ -30,15 +30,19 @@ def is_match(
     exclude: list[str],
 ) -> bool:
     """
-    Based on the include and exclude pattern, do we ignore this file?
+    Based on the include and exclude patterns, should this file be included?
 
     Explicit exclude > Explicit include > Implicit include
+
+    Patterns are matched with :meth:`pathlib.PurePath.match`, which anchors
+    at the end of the path, so ``*.py`` matches at any depth.
 
     :param relpath_parts: relative path parts of the file to be checked
         For example, if the file is /a/b/c/d.txt, and the base dir is /a,
         then relpath_parts should be ['b', 'c', 'd.txt']
     :param include: list of glob patterns to include
     :param exclude: list of glob patterns to exclude
+    :return: ``True`` if the file should be included
     """
     # Use Path to join parts in an OS-compatible way
     # This handles both Unix (/) and Windows (\) path separators
@@ -108,7 +112,6 @@ def copy_source_for_lambda_deployment(
     - Filtering source files based on include/exclude patterns
     - Automatically excluding Python cache files (``__pycache__``, ``*.pyc``, ``*.pyo``)
     - Preserving directory structure for proper module imports
-    - Creating a clean target directory for packaging
 
     :param source_dir: Source directory containing Python library code
     :param target_dir: Target directory where filtered files will be copied
@@ -133,7 +136,8 @@ def copy_source_for_lambda_deployment(
         )
 
     .. note::
-        The target directory is completely replaced if it exists. Python cache
+        Existing files in the target directory are not removed; matching files
+        are overwritten. Clean the target first if stale files matter. Python cache
         files (``__pycache__``, ``*.pyc``, ``*.pyo``) are always excluded regardless of
         the exclude parameter.
 

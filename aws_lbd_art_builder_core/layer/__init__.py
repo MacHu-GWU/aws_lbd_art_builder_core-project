@@ -3,16 +3,18 @@
 """
 AWS Lambda layer creation and deployment package.
 
-This package provides a complete 4-step workflow for creating, packaging, and deploying
-AWS Lambda layers with dependencies from Python package managers. It supports multiple
-dependency management tools and both local and containerized builds for cross-platform
-compatibility.
+This package provides the tool-agnostic parts of the 4-step workflow for
+creating, packaging, and deploying AWS Lambda layers. Step 1 (installing
+dependencies with pip, Poetry, or uv) is implemented by downstream packages
+such as ``aws_lbd_art_builder_uv``.
 
 **Complete Layer Workflow:**
 
-1. **Build** - Install and resolve dependencies using pip, Poetry, or UV
-2. **Package** - Structure and compress dependencies into deployable artifacts
-   - :mod:`package`: Transform build output into Lambda-compatible zip files
-3. **Upload** - Deploy layer artifacts to S3 storage for Lambda access
-4. **Publish** - Create versioned Lambda layer from stored artifacts
+1. **Build** - Install dependencies (downstream builder; core provides
+   :mod:`foundation` paths and the :mod:`builder` container base class)
+2. **Package** - :mod:`package`: compress ``python/`` into ``layer.zip``
+3. **Upload** - :mod:`upload`: upload ``layer.zip`` to an S3 staging location
+4. **Publish** - :mod:`publish`: create a versioned Lambda layer from it
+
+:mod:`workflow` runs all four steps with any builder.
 """

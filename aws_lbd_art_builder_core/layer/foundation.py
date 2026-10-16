@@ -57,7 +57,8 @@ class Credentials:
     @property
     def normalized_index_url(self) -> str:
         """
-        Normalize index URL by stripping scheme and trailing slashes.
+        Normalize index URL by stripping the ``https://`` scheme, a trailing
+        slash, and a trailing ``/simple``.
         """
         index_url = self.index_url
         if index_url.startswith("https://"):
@@ -130,6 +131,11 @@ class Credentials:
         """
         Configure Poetry authentication via environment variables.
 
+        The username is always ``"aws"`` (the AWS CodeArtifact convention),
+        not :attr:`username`; the password is :attr:`password`.
+
+        :return: The names of the username and password environment variables.
+
         .. seealso::
 
             https://python-poetry.org/docs/repositories/#configuring-credentials
@@ -143,6 +149,11 @@ class Credentials:
     def uv_login(self) -> tuple[str, str]:
         """
         Configure UV authentication via environment variables.
+
+        The username is always ``"aws"`` (the AWS CodeArtifact convention),
+        not :attr:`username`; the password is :attr:`password`.
+
+        :return: The names of the username and password environment variables.
 
         .. seealso::
 
@@ -229,11 +240,13 @@ class LayerPathLayout(BaseFrozenModel):
         """
         Convert local filesystem path to corresponding Docker container path.
 
-        Docker containers mount the project root to /var/task, so this method
-        translates local paths to their container equivalents for script execution.
+        Container builds mount :attr:`dir_build_lambda_layer` (not the project
+        root) to ``/var/task``, so this method translates a local path under
+        that directory to its container equivalent for script execution.
 
-        :param path_in_local: Local filesystem path relative to project root
+        :param path_in_local: Local filesystem path inside :attr:`dir_build_lambda_layer`
         :return: Corresponding path inside Docker container
+        :raises ValueError: If the path is not inside :attr:`dir_build_lambda_layer`
         """
         relpath = path_in_local.relative_to(self.dir_build_lambda_layer)
         parts = ["var", "task"]
@@ -542,7 +555,7 @@ class LayerManifestManager(BaseLogger):
     @cached_property
     def s3_layout(self) -> LayerS3Layout:
         """
-        :class:`LayerS3Layout` object for managing build paths.
+        :class:`LayerS3Layout` object for managing S3 paths.
         """
         return LayerS3Layout(
             s3dir_lambda=self.s3dir_lambda,

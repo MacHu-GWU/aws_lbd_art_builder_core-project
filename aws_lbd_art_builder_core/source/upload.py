@@ -10,8 +10,8 @@ deployment lifecycle:
 - :func:`build_and_upload_source_using_pip` — all-in-one: build dir (pip) → zip → upload
 - :func:`build_and_upload_source_using_uv`  — all-in-one: build dir (uv)  → zip → upload
 
-These functions depend on :mod:`.builder` (build step) and
-:mod:`.foundation` (path/S3 layout conventions) but are kept in a separate
+These functions depend on :mod:`aws_lbd_art_builder_core.source.builder` (build step) and
+:mod:`aws_lbd_art_builder_core.source.foundation` (path/S3 layout conventions) but are kept in a separate
 module so that callers can import only the upload logic without pulling in the
 build tooling.
 """

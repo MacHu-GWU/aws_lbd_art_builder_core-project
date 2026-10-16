@@ -6,10 +6,10 @@ build_source_dir_using_uv, and create_source_zip.
 
 Each build tool gets its own SourcePathLayout so the outputs are isolated:
 
-    tests/build/lambda/source/using_pip/build/   ← pip install target
-    tests/build/lambda/source/using_pip/source.zip
-    tests/build/lambda/source/using_uv/build/    ← uv install target
-    tests/build/lambda/source/using_uv/source.zip
+    tests/source/build/lambda/source/using_pip/build/   ← pip install target
+    tests/source/build/lambda/source/using_pip/source.zip
+    tests/source/build/lambda/source/using_uv/build/    ← uv install target
+    tests/source/build/lambda/source/using_uv/source.zip
 
 Directories are left on disk after the test run so the developer can inspect
 them.  They are cleaned at the start of each run (skip_prompt=True).

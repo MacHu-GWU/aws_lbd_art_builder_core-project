@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Base command classes for Lambda layer building — Step 1 of the layer workflow.
+Base command class for containerized Lambda layer builds — Step 1 of the layer workflow.
 
 **Why Command Pattern?**
 
@@ -12,15 +12,18 @@ change the function signature, which ripples through all callers.
 
 With the Command Pattern each knob is a dataclass field on the instance.
 Subclasses add fields freely without touching ``run()``'s signature (always
-zero-arg). Callers construct → optionally override steps → call ``run()``.
+zero-arg).
 
-This module provides two abstract bases:
+This module provides :class:`BaseLambdaLayerContainerBuilder`, which computes
+the Docker settings of a containerized build (image, platform, container name,
+``docker run`` arguments). It does not run a build itself: downstream packages
+(e.g. ``aws_lbd_art_builder_uv``) subclass it and implement ``run()`` with their
+tool-specific steps.
 
-- :class:`BaseLambdaLayerLocalBuilder` — builds directly on the host
-- :class:`BaseLambdaLayerContainerBuilder` — builds inside a Docker container
-
-Both follow a standardized 4-step workflow. Downstream packages (e.g.
-``aws_lbd_art_builder_uv``) subclass and implement the tool-specific steps.
+Core has no base class for local (on-host) builders. Any object with a
+``path_layout`` and a zero-argument ``run()`` can be passed to
+:class:`~aws_lbd_art_builder_core.layer.workflow.LayerDeploymentWorkflow`,
+see :class:`~aws_lbd_art_builder_core.layer.workflow.T_BUILDER`.
 """
 
 import dataclasses
@@ -42,9 +45,19 @@ class BaseLambdaLayerContainerBuilder(BaseLogger):
     Lambda runtime environment exactly. This is important for packages with
     C extensions that must be compiled for the target architecture.
 
-    **Usage**: Subclass and provide a tool-specific build script via
-    :attr:`path_script`. Call :meth:`run` to execute containerized build,
-    or customize individual steps as needed.
+    **Usage**: Subclass it and implement ``run()``. A typical subclass:
+
+    1. Cleans and creates the build directories
+       (:meth:`~aws_lbd_art_builder_core.layer.foundation.LayerPathLayout.clean`,
+       :meth:`~aws_lbd_art_builder_core.layer.foundation.LayerPathLayout.mkdirs`).
+    2. Copies its own container-side build script to
+       :attr:`~aws_lbd_art_builder_core.layer.foundation.LayerPathLayout.path_build_lambda_layer_in_container_script_in_local`,
+       and the files the script needs (``pyproject.toml``, lock file, credentials JSON)
+       into :attr:`~aws_lbd_art_builder_core.layer.foundation.LayerPathLayout.dir_build_lambda_layer`.
+       Only that directory is mounted into the container.
+    3. Runs ``subprocess.run(self.docker_run_args, check=True)``.
+    4. Moves the installed packages into
+       :attr:`~aws_lbd_art_builder_core.layer.foundation.LayerPathLayout.dir_python`.
     """
 
     path_pyproject_toml: Path = dataclasses.field(default=REQ)

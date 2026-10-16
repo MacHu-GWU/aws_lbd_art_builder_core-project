@@ -74,12 +74,14 @@ class TestBaseLambdaLayerContainerBuilder:
         assert "python" in args
         assert "-u" in args
 
-    def test_docker_run_args_mount_binds_project_root(self, tmp_path):
+    def test_docker_run_args_mount_binds_dir_build_lambda_layer(self, tmp_path):
         builder = self._make_builder(tmp_path, is_arm=False)
         args = builder.docker_run_args
         mount_arg = [a for a in args if a.startswith("type=bind")][0]
-        assert f"source={tmp_path}" in mount_arg
-        assert "target=/var/task" in mount_arg
+        dir_build_lambda_layer = tmp_path / "build" / "lambda" / "layer"
+        assert mount_arg == (
+            f"type=bind,source={dir_build_lambda_layer},target=/var/task"
+        )
 
     def test_path_layout_is_created(self, tmp_path):
         builder = self._make_builder(tmp_path)

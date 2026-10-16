@@ -99,7 +99,8 @@ def create_layer_zip_file(
     :param dir_python: Path to the ``python/`` directory containing layer packages
     :param path_layer_zip: Output path for the layer zip file
     :param ignore_package_list: Packages to exclude from the zip.
-        If None, uses :data:`default_ignore_package_list`.
+        If None, uses :data:`default_ignore_package_list`. Each name is a
+        prefix match: ``pip`` also excludes ``pipx`` and ``pip-*.dist-info``.
     :param verbose: If True, shows detailed zip creation progress
     """
     if ignore_package_list is None:

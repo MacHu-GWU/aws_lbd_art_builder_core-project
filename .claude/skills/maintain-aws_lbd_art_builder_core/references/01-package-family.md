@@ -51,7 +51,7 @@ aws_lbd_art_builder_core/
 │   ├── publish.py      # LambdaLayerVersionPublisher, LayerDeployment
 │   ├── workflow.py     # T_BUILDER, LayerDeploymentWorkflow
 │   └── api.py
-├── tests/              # Test helpers shipped in the package (05-test-strategy.md)
+├── tests/              # Test helpers for this repo's tests; excluded from the wheel (05-test-strategy.md)
 └── vendor/             # better_pathlib.temp_cwd, hashes, timer, pytest_cov_helper
 ```
 

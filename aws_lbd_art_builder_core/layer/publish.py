@@ -12,8 +12,8 @@ Creating a Lambda layer version is a non-reversible, append-only operation
 (versions can be deleted but not overwritten). Publishing identical
 dependencies as a new version wastes version numbers and forces downstream
 stacks to update for no reason. This module compares the local dependency
-manifest against the previously stored one and skips the publish when nothing
-has changed.
+manifest against the previously stored one and refuses to publish (raises
+``ValueError``) when nothing has changed.
 """
 
 import typing as T
@@ -150,8 +150,11 @@ class LambdaLayerVersionPublisher(LayerManifestManager):
         Check if dependencies have changed since the last publication.
 
         This is the core intelligence that prevents unnecessary layer version
-        creation — skips publishing when the manifest is identical to the
-        previously published one.
+        creation.
+
+        :raises ValueError: If the manifest is identical to the one stored for
+            the latest published layer version. Callers that want to skip
+            silently must catch it.
         """
         self.log(
             "--- Step 1.3 - Check if dependencies have changed since last publication"

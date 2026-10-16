@@ -18,7 +18,7 @@ Requirements to run locally: the system `zip` binary, `uv` on `PATH`, and pip in
 
 ## 2. `BaseMockAwsTest` (`aws_lbd_art_builder_core/tests/mock_aws.py`)
 
-It ships inside the package (not under `tests/`) so sub-packages can reuse it.
+It lives in the package's `tests/` helper folder, which `pyproject.toml` excludes from the wheel: only this repo's tests can import it, not sub-packages.
 
 - `setup_class` starts `moto.mock_aws()`, makes a `boto3.Session(region_name="us-east-1")`, and sets `cls.boto_ses` and `cls.s3_client`. It then calls `setup_class_post_hook()`.
 - Subclasses override `setup_class_post_hook()` to create buckets (`cls.create_s3_bucket(name)`), make other clients (`cls.boto_ses.client("lambda")`), build fake inputs, and run the expensive flow **once**, storing the result on `cls`. Each `test_*` method then only asserts on that result.

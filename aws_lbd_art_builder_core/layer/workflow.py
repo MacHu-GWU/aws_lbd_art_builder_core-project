@@ -92,6 +92,8 @@ class LayerDeploymentWorkflow(BaseLogger):  # pragma: no cover
 
     Example::
 
+        from pathlib import Path
+
         import boto3
         import aws_lbd_art_builder_uv.api as aws_lbd_art_builder_uv
         from s3pathlib.api import S3Path
