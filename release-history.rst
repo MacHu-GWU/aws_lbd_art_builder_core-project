@@ -26,6 +26,8 @@ x.y.z (Backlog)
 **Miscellaneous**
 
 - Replaced the ``learn-this-project`` agent skill and the Sphinx Maintainer Guide (``docs/source/99-Maintainer-Guide/``) with the ``maintain-aws_lbd_art_builder_core`` agent skill. Its references were rewritten from the current code: the old guide still described classes removed in 0.1.3.
+- Refreshed ``README.rst`` for 1.x: what the layer and source pipelines do, a quick-look example of each, and the ``upload`` / ``publish`` install extras.
+- Fixed outdated docstrings that still described the removed ``BaseLambdaLayerLocalBuilder``, the wrong container mount, and a publish "skip" that is actually a ``ValueError``.
 
 
 0.1.5 (2026-09-02)

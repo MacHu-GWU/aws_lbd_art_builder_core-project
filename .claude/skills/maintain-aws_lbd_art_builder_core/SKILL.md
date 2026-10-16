@@ -25,5 +25,6 @@ Knowledge that only this repo needs. The conventions shared by every pywf open-s
 ## Related skills
 
 - `pywf-oss-base`: repo-wide conventions, and which `pywf-oss-*` skill does which job (add a module, write tests, write docs, changelog, release).
+- `pypi-aws_lbd_art_builder_core`: this library's public API as seen by its users. After changing a public name, signature, or behavior, regenerate it with `pywf-oss-write-pypi-skill`.
 - `pypi-s3pathlib`: the `S3Path` API used for every S3 path and call here.
 - `maintain-aws_lbd_art_builder_uv`, in `../aws_lbd_art_builder_uv-project`: how the uv sub-package builds layers on top of core.
