@@ -23,6 +23,10 @@ x.y.z (Backlog)
 - Every ``s3_client`` argument and field (``upload_source_zip()``, ``build_and_upload_source_using_pip()``, ``build_and_upload_source_using_uv()``, ``upload_layer_zip_to_s3()``, ``LambdaLayerVersionPublisher``, ``LayerDeploymentWorkflow``, and so on) now only accepts a boto3 S3 client. A ``BotoSesManager`` raises ``TypeError``: pass ``bsm.s3_client`` instead.
 - ``boto_session_manager`` and ``pathlib_mate`` are no longer installed with the ``upload`` and ``publish`` extras, because s3pathlib 3.x dropped them. Add them to your own dependencies if you import them.
 
+**Miscellaneous**
+
+- Replaced the ``learn-this-project`` agent skill and the Sphinx Maintainer Guide (``docs/source/99-Maintainer-Guide/``) with the ``maintain-aws_lbd_art_builder_core`` agent skill. Its references were rewritten from the current code: the old guide still described classes removed in 0.1.3.
+
 
 0.1.5 (2026-09-02)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

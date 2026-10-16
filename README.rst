@@ -59,7 +59,7 @@ Core never calls ``pip install``, ``uv sync``, or ``poetry install`` directly â€
 
 .. tip::
 
-    If you are using `Claude Code <https://claude.ai/claude-code>`_, run the ``learn-this-project`` agent skill to quickly onboard and understand this project's architecture.
+    If you are using `Claude Code <https://claude.ai/claude-code>`_, load the ``maintain-aws_lbd_art_builder_core`` agent skill to learn how this project works before changing it.
 
 
 .. _install:

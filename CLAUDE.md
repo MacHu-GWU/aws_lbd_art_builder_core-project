@@ -6,7 +6,7 @@ What this library does: see `README.rst`.
 
 Package: `aws_lbd_art_builder_core/` (import name `aws_lbd_art_builder_core`).
 
-This is the core of a 1+N package family (pip, poetry, uv tool-specific sub-packages). Load the `learn-this-project` skill before working on the code.
+This is the core of a 1+N package family (pip, poetry, uv tool-specific sub-packages). Load the `maintain-aws_lbd_art_builder_core` skill before changing the library code or its tests; it holds how the layer and source pipelines work, what sub-packages rely on, and how the tests are split.
 
 This package does not support Windows.
 
