@@ -18,7 +18,7 @@ Usage::
         path_manifest=Path("uv.lock"),
         s3dir_lambda=S3Path("s3://bucket/lambda/"),
         layer_name="my_layer",
-        s3_client=bsm,
+        s3_client=s3_client,
         lambda_client=lambda_client,
     )
     layer_deployment = deployment.run()
@@ -61,7 +61,7 @@ class T_BUILDER(T.Protocol):
 
 
 @dataclasses.dataclass(frozen=True)
-class LayerDeploymentWorkflow(BaseLogger): # pragma: no cover
+class LayerDeploymentWorkflow(BaseLogger):  # pragma: no cover
     """
     One-stop orchestrator for the complete Lambda layer lifecycle.
 
@@ -77,7 +77,7 @@ class LayerDeploymentWorkflow(BaseLogger): # pragma: no cover
         (e.g. ``S3Path("s3://my-bucket/projects/my_app/lambda/")``).
     :param layer_name: Name of the Lambda layer to create / update
         (e.g. ``"my_app"``).
-    :param s3_client: Boto3 S3 client (or ``BotoSesManager``) for S3 operations.
+    :param s3_client: Boto3 S3 client for S3 operations.
     :param lambda_client: Boto3 Lambda client for publishing the layer version.
     :param ignore_package_list: Packages to exclude from ``layer.zip``.
         Defaults to :data:`~aws_lbd_art_builder_core.layer.package.default_ignore_package_list`
@@ -92,13 +92,13 @@ class LayerDeploymentWorkflow(BaseLogger): # pragma: no cover
 
     Example::
 
+        import boto3
         import aws_lbd_art_builder_uv.api as aws_lbd_art_builder_uv
-        from boto_session_manager import BotoSesManager
-        from s3pathlib import S3Path
+        from s3pathlib.api import S3Path
 
         from aws_lbd_art_builder_core.layer.workflow import LayerDeploymentWorkflow
 
-        bsm = BotoSesManager(region_name="us-east-1")
+        boto_ses = boto3.Session(region_name="us-east-1")
 
         # 1. Create a builder (downstream package provides this)
         builder = aws_lbd_art_builder_uv.layer_api.UvLambdaLayerLocalBuilder(
@@ -112,8 +112,8 @@ class LayerDeploymentWorkflow(BaseLogger): # pragma: no cover
             path_manifest=Path("uv.lock"),
             s3dir_lambda=S3Path("s3://my-bucket/projects/my_app/lambda/"),
             layer_name="my_app",
-            s3_client=bsm,
-            lambda_client=bsm.lambda_client,
+            s3_client=boto_ses.client("s3"),
+            lambda_client=boto_ses.client("lambda"),
             publish_layer_version_kwargs={
                 "CompatibleRuntimes": ["python3.12"],
                 "Description": "my_app dependencies layer",
@@ -122,6 +122,7 @@ class LayerDeploymentWorkflow(BaseLogger): # pragma: no cover
         result = workflow.run()
         print(result.layer_version_arn)
     """
+
     # fmt: off
     # Step 1
     builder: T_BUILDER = dataclasses.field(default=REQ)

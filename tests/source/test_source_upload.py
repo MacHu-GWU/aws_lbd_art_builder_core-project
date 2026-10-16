@@ -21,7 +21,7 @@ try:
 except ImportError:  # pragma: no cover
     import tomli as tomllib
 
-from s3pathlib import S3Path
+from s3pathlib.api import S3Path
 
 from aws_lbd_art_builder_core.tests.mock_aws import BaseMockAwsTest
 from aws_lbd_art_builder_core.constants import S3MetadataKeyEnum
@@ -49,6 +49,7 @@ LAYOUT_UV = SourcePathLayout(
 # ---------------------------------------------------------------------------
 # Tests: upload_source_zip
 # ---------------------------------------------------------------------------
+
 
 class TestUploadSourceZip(BaseMockAwsTest):
     use_mock = True
@@ -111,7 +112,7 @@ class TestUploadSourceZip(BaseMockAwsTest):
             s3dir_source=self.s3dir_source,
             verbose=False,
         )
-        assert s3path.exists(bsm=self.s3_client)
+        assert s3path.exists(s3_client=self.s3_client)
 
     # ------------------------------------------------------------------
     # Metadata
@@ -217,6 +218,7 @@ class TestUploadSourceZip(BaseMockAwsTest):
 # Tests: build_and_upload_source_using_pip
 # ---------------------------------------------------------------------------
 
+
 class TestBuildAndUploadSourceUsingPip(BaseMockAwsTest):
     use_mock = True
 
@@ -248,10 +250,12 @@ class TestBuildAndUploadSourceUsingPip(BaseMockAwsTest):
         assert self.result.s3path_source_zip.basename == "source.zip"
 
     def test_object_exists_in_s3(self):
-        assert self.result.s3path_source_zip.exists(bsm=self.s3_client)
+        assert self.result.s3path_source_zip.exists(s3_client=self.s3_client)
 
     def test_s3path_contains_version_from_pyproject_toml(self):
-        expected_version = tomllib.loads(PATH_PYPROJECT_TOML.read_text())["project"]["version"]
+        expected_version = tomllib.loads(PATH_PYPROJECT_TOML.read_text())["project"][
+            "version"
+        ]
         assert expected_version in self.result.s3path_source_zip.key
 
     def test_s3path_contains_sha256(self):
@@ -259,7 +263,9 @@ class TestBuildAndUploadSourceUsingPip(BaseMockAwsTest):
 
     def test_s3path_matches_layout(self):
         layout = SourceS3Layout(dir_root=self.s3dir_source)
-        expected_version = tomllib.loads(PATH_PYPROJECT_TOML.read_text())["project"]["version"]
+        expected_version = tomllib.loads(PATH_PYPROJECT_TOML.read_text())["project"][
+            "version"
+        ]
         expected = layout.get_s3path_source_zip(
             source_version=expected_version,
             source_sha256=self.result.source_sha256,
@@ -270,6 +276,7 @@ class TestBuildAndUploadSourceUsingPip(BaseMockAwsTest):
 # ---------------------------------------------------------------------------
 # Tests: build_and_upload_source_using_uv
 # ---------------------------------------------------------------------------
+
 
 class TestBuildAndUploadSourceUsingUv(BaseMockAwsTest):
     use_mock = True
@@ -305,10 +312,12 @@ class TestBuildAndUploadSourceUsingUv(BaseMockAwsTest):
         assert self.result.s3path_source_zip.basename == "source.zip"
 
     def test_object_exists_in_s3(self):
-        assert self.result.s3path_source_zip.exists(bsm=self.s3_client)
+        assert self.result.s3path_source_zip.exists(s3_client=self.s3_client)
 
     def test_s3path_contains_version_from_pyproject_toml(self):
-        expected_version = tomllib.loads(PATH_PYPROJECT_TOML.read_text())["project"]["version"]
+        expected_version = tomllib.loads(PATH_PYPROJECT_TOML.read_text())["project"][
+            "version"
+        ]
         assert expected_version in self.result.s3path_source_zip.key
 
     def test_s3path_contains_sha256(self):
@@ -316,7 +325,9 @@ class TestBuildAndUploadSourceUsingUv(BaseMockAwsTest):
 
     def test_s3path_matches_layout(self):
         layout = SourceS3Layout(dir_root=self.s3dir_source)
-        expected_version = tomllib.loads(PATH_PYPROJECT_TOML.read_text())["project"]["version"]
+        expected_version = tomllib.loads(PATH_PYPROJECT_TOML.read_text())["project"][
+            "version"
+        ]
         expected = layout.get_s3path_source_zip(
             source_version=expected_version,
             source_sha256=self.result.source_sha256,
@@ -327,6 +338,7 @@ class TestBuildAndUploadSourceUsingUv(BaseMockAwsTest):
 # ---------------------------------------------------------------------------
 # Tests: BuildAndUploadSourceResult
 # ---------------------------------------------------------------------------
+
 
 class TestBuildAndUploadSourceResult:
     def test_fields(self):

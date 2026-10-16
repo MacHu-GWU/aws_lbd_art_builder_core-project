@@ -19,7 +19,7 @@ import pytest
 
 s3pathlib = pytest.importorskip("s3pathlib")
 
-from s3pathlib import S3Path
+from s3pathlib.api import S3Path
 
 from aws_lbd_art_builder_core.layer.foundation import LayerS3Layout
 
@@ -278,7 +278,10 @@ class TestLayerPathLayout:
         layout.dir_build_lambda_layer.mkdir(parents=True, exist_ok=True)
         messages = []
         layout.copy_build_script(p_src=script_src, printer=messages.append)
-        assert layout.path_build_lambda_layer_in_container_script_in_local.read_text() == "print('hello')"
+        assert (
+            layout.path_build_lambda_layer_in_container_script_in_local.read_text()
+            == "print('hello')"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -313,7 +316,9 @@ class TestLayerS3Layout:
 
     def test_get_s3path_layer_manifest_requirements_txt(self):
         s3path = self.layout.get_s3path_layer_manifest(1, "requirements.txt")
-        assert s3path.uri == "s3://my-bucket/lambda/my-func/layer/000001/requirements.txt"
+        assert (
+            s3path.uri == "s3://my-bucket/lambda/my-func/layer/000001/requirements.txt"
+        )
 
     def test_get_s3path_layer_manifest_uv_lock(self):
         s3path = self.layout.get_s3path_layer_manifest(2, "uv.lock")
@@ -433,7 +438,9 @@ class TestLayerManifestManager:
             s3_client=None,
         )
         s3path = mgr.get_versioned_manifest(version=1)
-        assert s3path.uri == "s3://my-bucket/lambda/my-func/layer/000001/requirements.txt"
+        assert (
+            s3path.uri == "s3://my-bucket/lambda/my-func/layer/000001/requirements.txt"
+        )
 
 
 if __name__ == "__main__":

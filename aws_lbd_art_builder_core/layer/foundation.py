@@ -61,7 +61,7 @@ class Credentials:
         """
         index_url = self.index_url
         if index_url.startswith("https://"):
-            index_url = index_url[len("https://"):]
+            index_url = index_url[len("https://") :]
         if index_url.endswith("/"):
             index_url = index_url[:-1]
         if index_url.endswith("/simple"):
@@ -221,7 +221,9 @@ class LayerPathLayout(BaseFrozenModel):
         """
         # TODO: support Windows
         major, minor, micro = self.venv_python_version
-        return self.dir_repo / ".venv" / "lib" / f"python{major}.{minor}" / "site-packages"
+        return (
+            self.dir_repo / ".venv" / "lib" / f"python{major}.{minor}" / "site-packages"
+        )
 
     def get_path_in_container(self, path_in_local: Path) -> str:
         """

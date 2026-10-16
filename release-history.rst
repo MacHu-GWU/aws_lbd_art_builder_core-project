@@ -15,6 +15,15 @@ x.y.z (Backlog)
 **Miscellaneous**
 
 
+1.0.0 (2026-10-15)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**Breaking Changes**
+
+- The ``upload`` and ``publish`` extras now require ``s3pathlib>=3.0.0,<4.0.0`` (was ``>=2.0.1,<3.0.0``). s3pathlib 2.x is no longer supported. If your project uses s3pathlib directly, import ``S3Path`` from ``s3pathlib.api`` and pass ``s3_client=`` instead of ``bsm=``.
+- Every ``s3_client`` argument and field (``upload_source_zip()``, ``build_and_upload_source_using_pip()``, ``build_and_upload_source_using_uv()``, ``upload_layer_zip_to_s3()``, ``LambdaLayerVersionPublisher``, ``LayerDeploymentWorkflow``, and so on) now only accepts a boto3 S3 client. A ``BotoSesManager`` raises ``TypeError``: pass ``bsm.s3_client`` instead.
+- ``boto_session_manager`` and ``pathlib_mate`` are no longer installed with the ``upload`` and ``publish`` extras, because s3pathlib 3.x dropped them. Add them to your own dependencies if you import them.
+
+
 0.1.5 (2026-09-02)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 **Features and Improvements**

@@ -63,9 +63,7 @@ def test_is_match():
     assert is_match(["module.py"], ["*.py"], ["test_*.py"]) is True
 
     # Case 5: With include, with overlapping exclude (exclude takes precedence)
-    assert (
-        is_match(["file.py"], ["*.py", "**/*.py"], ["folder/*.py"]) is True
-    )
+    assert is_match(["file.py"], ["*.py", "**/*.py"], ["folder/*.py"]) is True
     assert (
         is_match(["folder", "file.py"], ["*.py", "**/*.py"], ["folder/*.py"]) is False
     )

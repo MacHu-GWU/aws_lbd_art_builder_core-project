@@ -69,5 +69,5 @@ def upload_layer_zip_to_s3(
                 S3MetadataKeyEnum.manifest_md5.value: manifest_manager.manifest_md5,
             },
         },
-        bsm=s3_client,
+        s3_client=s3_client,
     )

@@ -16,4 +16,5 @@ sub packages and modules
     package <package>
     publish <publish>
     upload <upload>
+    workflow <workflow>
     

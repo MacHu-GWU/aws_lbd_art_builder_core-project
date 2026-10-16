@@ -9,7 +9,7 @@ from aws_lbd_art_builder_core.source.foundation import SourceS3Layout
 
 s3pathlib = pytest.importorskip("s3pathlib")
 
-from s3pathlib import S3Path
+from s3pathlib.api import S3Path
 
 
 class TestSourcePathLayout:
@@ -30,7 +30,9 @@ class TestSourcePathLayout:
         assert self.layout.dir_build == Path("/project/build/lambda/source/build")
 
     def test_path_source_zip(self):
-        assert self.layout.path_source_zip == Path("/project/build/lambda/source/source.zip")
+        assert self.layout.path_source_zip == Path(
+            "/project/build/lambda/source/source.zip"
+        )
 
     def test_source_zip_sits_at_dir_root_not_inside_build(self):
         # source.zip must be a direct child of dir_root, not nested inside dir_build.
@@ -95,7 +97,9 @@ class TestSourceS3Layout:
         )
         assert s3path.bucket == "my-bucket"
         assert s3path.key == "lambda/my-func/source/0.1.1/abc123/source.zip"
-        assert s3path.uri == "s3://my-bucket/lambda/my-func/source/0.1.1/abc123/source.zip"
+        assert (
+            s3path.uri == "s3://my-bucket/lambda/my-func/source/0.1.1/abc123/source.zip"
+        )
 
     def test_filename_is_source_zip(self):
         layout = SourceS3Layout(dir_root=self.s3dir_source)

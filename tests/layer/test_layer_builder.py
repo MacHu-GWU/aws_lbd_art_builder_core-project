@@ -14,7 +14,6 @@ from aws_lbd_art_builder_core.layer.builder import BaseLambdaLayerContainerBuild
 
 
 class TestBaseLambdaLayerContainerBuilder:
-
     def _make_builder(self, tmp_path, is_arm=False, **kwargs):
         pyproject = tmp_path / "pyproject.toml"
         pyproject.write_text("")

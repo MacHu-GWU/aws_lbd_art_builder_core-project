@@ -132,7 +132,7 @@ def build_source_dir_using_uv(
     :param verbose: When ``True``, print the uv command and its output.
     :param printer: Callable used for log output (default: :func:`print`).
     """
-    if verbose: # pragma: no cover
+    if verbose:  # pragma: no cover
         printer("--- Building Lambda source dir using uv ...")
         printer(f"{path_bin_uv = !s}")
         printer(f"{path_pyproject_toml = !s}")

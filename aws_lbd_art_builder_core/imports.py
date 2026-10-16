@@ -3,7 +3,7 @@
 from soft_deps.api import MissingDependency
 
 try:
-    from s3pathlib import S3Path
+    from s3pathlib.api import S3Path
 except ImportError:  # pragma: no cover
     S3Path = MissingDependency(
         name="s3pathlib",

@@ -15,7 +15,7 @@ import zipfile
 from pathlib import Path
 
 import pytest
-from s3pathlib import S3Path
+from s3pathlib.api import S3Path
 
 from aws_lbd_art_builder_core.layer.foundation import LayerPathLayout
 from aws_lbd_art_builder_core.layer.foundation import LayerS3Layout
@@ -97,8 +97,8 @@ class TestPublisherPreflightChecks(BaseMockAwsTest):
         # make sure there's no zip in S3
         s3_layout = LayerS3Layout(s3dir_lambda=self.s3dir_lambda)
         s3path = s3_layout.s3path_temp_layer_zip
-        if s3path.exists(bsm=self.s3_client):
-            s3path.delete(bsm=self.s3_client)
+        if s3path.exists(s3_client=self.s3_client):
+            s3path.delete(s3_client=self.s3_client)
 
         publisher = self._make_publisher()
         assert publisher.is_layer_zip_exists() is False
@@ -111,8 +111,8 @@ class TestPublisherPreflightChecks(BaseMockAwsTest):
     def test_step_1_1_raises_when_zip_not_exists(self):
         s3_layout = LayerS3Layout(s3dir_lambda=self.s3dir_lambda)
         s3path = s3_layout.s3path_temp_layer_zip
-        if s3path.exists(bsm=self.s3_client):
-            s3path.delete(bsm=self.s3_client)
+        if s3path.exists(s3_client=self.s3_client):
+            s3path.delete(s3_client=self.s3_client)
 
         publisher = self._make_publisher()
         with pytest.raises(FileNotFoundError, match="does not exist"):
@@ -230,10 +230,10 @@ class TestPublisherFullWorkflow(BaseMockAwsTest):
         assert self.LAYER_NAME in self.result.layer_version_arn
 
     def test_manifest_stored_in_s3(self):
-        assert self.result.s3path_manifest.exists(bsm=self.s3_client)
+        assert self.result.s3path_manifest.exists(s3_client=self.s3_client)
 
     def test_manifest_content_matches_local(self):
-        stored = self.result.s3path_manifest.read_text(bsm=self.s3_client)
+        stored = self.result.s3path_manifest.read_text(s3_client=self.s3_client)
         local = self.path_manifest.read_text()
         assert stored == local
 
@@ -274,7 +274,6 @@ class TestPublisherFullWorkflow(BaseMockAwsTest):
 # Tests: LayerDeployment
 # ---------------------------------------------------------------------------
 class TestLayerDeployment:
-
     def test_fields(self):
         s3path = S3Path("my-bucket/lambda/layer/000001/uv.lock")
         deployment = LayerDeployment(

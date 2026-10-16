@@ -18,9 +18,10 @@ import pytest
 # Tests: move_to_dir_python
 # ---------------------------------------------------------------------------
 class TestMoveToDirPython:
-
     def test_move_site_packages_to_dir_python(self, tmp_path):
-        site_packages = tmp_path / "repo" / ".venv" / "lib" / "python3.12" / "site-packages"
+        site_packages = (
+            tmp_path / "repo" / ".venv" / "lib" / "python3.12" / "site-packages"
+        )
         site_packages.mkdir(parents=True)
         (site_packages / "my_pkg").mkdir()
         (site_packages / "my_pkg" / "__init__.py").write_text("# pkg")
@@ -67,7 +68,6 @@ class TestMoveToDirPython:
 # Tests: create_layer_zip_file
 # ---------------------------------------------------------------------------
 class TestCreateLayerZipFile:
-
     def _setup_python_dir(self, tmp_path):
         """Create a fake artifacts/python/ directory with some packages."""
         artifacts = tmp_path / "artifacts"
@@ -99,7 +99,9 @@ class TestCreateLayerZipFile:
         create_layer_zip_file(dir_python, path_layer_zip, verbose=False)
         with zipfile.ZipFile(path_layer_zip) as zf:
             for name in zf.namelist():
-                assert name.startswith("python/"), f"entry {name!r} missing python/ prefix"
+                assert name.startswith("python/"), (
+                    f"entry {name!r} missing python/ prefix"
+                )
 
     def test_ignored_packages_excluded(self, tmp_path):
         dir_python, path_layer_zip = self._setup_python_dir(tmp_path)
@@ -154,7 +156,6 @@ class TestCreateLayerZipFile:
 # Tests: default_ignore_package_list
 # ---------------------------------------------------------------------------
 class TestDefaultIgnorePackageList:
-
     def test_is_list(self):
         assert isinstance(default_ignore_package_list, list)
 

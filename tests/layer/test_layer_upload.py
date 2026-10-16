@@ -13,7 +13,7 @@ import hashlib
 import zipfile
 from pathlib import Path
 
-from s3pathlib import S3Path
+from s3pathlib.api import S3Path
 
 from aws_lbd_art_builder_core.constants import S3MetadataKeyEnum
 from aws_lbd_art_builder_core.layer.foundation import LayerPathLayout
@@ -89,7 +89,7 @@ class TestUploadLayerZipToS3(BaseMockAwsTest):
             verbose=False,
         )
         s3_layout = LayerS3Layout(s3dir_lambda=self.s3dir_lambda)
-        assert s3_layout.s3path_temp_layer_zip.exists(bsm=self.s3_client)
+        assert s3_layout.s3path_temp_layer_zip.exists(s3_client=self.s3_client)
 
     # ------------------------------------------------------------------
     # S3 path matches layout
@@ -104,7 +104,9 @@ class TestUploadLayerZipToS3(BaseMockAwsTest):
         )
         s3_layout = LayerS3Layout(s3dir_lambda=self.s3dir_lambda)
         s3path = s3_layout.s3path_temp_layer_zip
-        assert s3path.uri == "s3://test-layer-upload-bucket/lambda/my-func/layer/layer.zip"
+        assert (
+            s3path.uri == "s3://test-layer-upload-bucket/lambda/my-func/layer/layer.zip"
+        )
 
     # ------------------------------------------------------------------
     # Content type

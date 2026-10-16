@@ -46,6 +46,7 @@ LAYOUT_UV = SourcePathLayout(
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="module")
 def path_bin_pip() -> Path:
     # builder.py converts Path to str via f"{path_bin_pip}" before subprocess.run,
@@ -101,6 +102,7 @@ def uv_zip_sha256(uv_build_dir) -> str:
 # Shared assertions (used by both pip and uv test classes)
 # ---------------------------------------------------------------------------
 
+
 def _assert_build_dir(build_dir: Path):
     assert build_dir.exists() and build_dir.is_dir()
     assert (build_dir / "aws_lbd_art_builder_core").is_dir()
@@ -120,6 +122,7 @@ def _assert_build_dir(build_dir: Path):
 # Tests: build_source_dir_using_pip
 # ---------------------------------------------------------------------------
 
+
 class TestBuildSourceDirUsingPip:
     def test_build_dir_structure(self, pip_build_dir):
         _assert_build_dir(pip_build_dir)
@@ -133,6 +136,7 @@ class TestBuildSourceDirUsingPip:
 # Tests: build_source_dir_using_uv
 # ---------------------------------------------------------------------------
 
+
 class TestBuildSourceDirUsingUv:
     def test_build_dir_structure(self, uv_build_dir):
         _assert_build_dir(uv_build_dir)
@@ -144,6 +148,7 @@ class TestBuildSourceDirUsingUv:
 # ---------------------------------------------------------------------------
 # Tests: create_source_zip  (uses the uv build as input)
 # ---------------------------------------------------------------------------
+
 
 class TestCreateSourceZip:
     def test_zip_file_is_created(self, uv_zip_sha256):

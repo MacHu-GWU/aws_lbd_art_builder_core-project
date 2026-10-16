@@ -102,7 +102,7 @@ def upload_source_zip(
         path=path_source_zip,
         overwrite=True,
         extra_args=extra_args,
-        bsm=s3_client,
+        s3_client=s3_client,
     )
     return s3path_source_zip
 
@@ -169,7 +169,9 @@ def build_and_upload_source_using_pip(
         verbose=verbose,
         printer=printer,
     )
-    source_version = tomllib.loads(path_pyproject_toml.read_text())["project"]["version"]
+    source_version = tomllib.loads(path_pyproject_toml.read_text())["project"][
+        "version"
+    ]
     s3path_source_zip = upload_source_zip(
         s3_client=s3_client,
         source_version=source_version,
@@ -237,7 +239,9 @@ def build_and_upload_source_using_uv(
         verbose=verbose,
         printer=printer,
     )
-    source_version = tomllib.loads(path_pyproject_toml.read_text())["project"]["version"]
+    source_version = tomllib.loads(path_pyproject_toml.read_text())["project"][
+        "version"
+    ]
     s3path_source_zip = upload_source_zip(
         s3_client=s3_client,
         source_version=source_version,

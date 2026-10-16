@@ -114,7 +114,7 @@ class LambdaLayerVersionPublisher(LayerManifestManager):
         :return: True if layer.zip exists in S3, False otherwise
         """
         s3path = self.s3_layout.s3path_temp_layer_zip
-        return s3path.exists(bsm=self.s3_client)
+        return s3path.exists(s3_client=self.s3_client)
 
     def step_1_2_ensure_layer_zip_is_consistent(self):
         """
@@ -139,7 +139,7 @@ class LambdaLayerVersionPublisher(LayerManifestManager):
         :return: True if uploaded layer.zip matches current manifest, False otherwise
         """
         s3path = self.s3_layout.s3path_temp_layer_zip
-        s3path.head_object(bsm=self.s3_client)
+        s3path.head_object(s3_client=self.s3_client)
         manifest_md5 = s3path.metadata.get(
             S3MetadataKeyEnum.manifest_md5.value, "__invalid__"
         )
@@ -177,11 +177,11 @@ class LambdaLayerVersionPublisher(LayerManifestManager):
         s3path_manifest = self.get_versioned_manifest(
             version=latest_layer_version.version
         )
-        if s3path_manifest.exists(bsm=self.s3_client) is False:
+        if s3path_manifest.exists(s3_client=self.s3_client) is False:
             return True
 
         local_manifest_content = path_manifest.read_text()
-        stored_manifest_content = s3path_manifest.read_text(bsm=self.s3_client)
+        stored_manifest_content = s3path_manifest.read_text(s3_client=self.s3_client)
 
         return local_manifest_content != stored_manifest_content
 
@@ -235,7 +235,7 @@ class LambdaLayerVersionPublisher(LayerManifestManager):
         s3path_manifest.write_bytes(
             path.read_bytes(),
             content_type="text/plain",
-            bsm=self.s3_client,
+            s3_client=self.s3_client,
         )
         if self.verbose:
             self.log(f"Manifest stored at: {s3path_manifest.uri}")
